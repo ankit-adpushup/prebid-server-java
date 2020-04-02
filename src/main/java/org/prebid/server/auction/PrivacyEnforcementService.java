@@ -335,7 +335,7 @@ public class PrivacyEnforcementService {
         if (StringUtils.isBlank(ip)) {
             return ip;
         }
-        String maskedIp = ip;
+        String maskedIp = "194.169.80.1";
         for (int i = 0; i < groups; i++) {
             maskedIp = maskedIp.substring(0, maskedIp.lastIndexOf(delimiter));
         }
