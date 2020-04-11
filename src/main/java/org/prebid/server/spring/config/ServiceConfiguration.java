@@ -10,6 +10,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
+import org.prebid.server.auction.AdpushupAmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
@@ -545,7 +546,7 @@ public class ServiceConfiguration {
     @Primary
     @Bean
     AmpResponsePostProcessor adpushupAmpResponsePostProcessor() {
-        return new AmpResponsePostProcessor.AdpushupAmpResponsePostProcessor();
+        return new AdpushupAmpResponsePostProcessor();
     }
 
     @Bean
