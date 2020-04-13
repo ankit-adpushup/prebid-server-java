@@ -5,15 +5,38 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
+import org.prebid.server.json.EncodeException;
+import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.response.AmpResponse;
+import org.prebid.server.util.HttpUtil;
+import org.prebid.server.vertx.http.BasicHttpClient;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcessor {
+
+    private Vertx vertx;
+    private BasicHttpClient httpClient;
+    private JacksonMapper mapper;
+    private Logger logger;
+    private String imdFeedbackUrl;
+
+    public AdpushupAmpResponsePostProcessor(String imdFeedbackUrl, JacksonMapper mapper) {
+        this.logger = LoggerFactory.getLogger(AdpushupAmpResponsePostProcessor.class);
+        this.vertx = Vertx.vertx();
+        this.httpClient = new BasicHttpClient(vertx, vertx.createHttpClient());
+        this.mapper = Objects.requireNonNull(mapper);
+        this.imdFeedbackUrl = imdFeedbackUrl;
+    }
 
     @Override
     public Future<AmpResponse> postProcess(BidRequest bidRequest, BidResponse bidResponse, AmpResponse ampResponse,
@@ -31,6 +54,18 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 }
             }
             newTargeting.put("hb_ap_pb", TextNode.valueOf(newTargeting.remove("hb_pb").textValue()));
+            try {
+                String json = mapper.encode(newTargeting);
+                String bidResJson = mapper.encode(bidResponse);
+                Map<String, String> postBodyMap = new HashMap<String, String>();
+                postBodyMap.put("targeting", json);
+                postBodyMap.put("bidResponse", bidResJson);
+                String postBody = mapper.encode(postBodyMap);
+                Future<?> future = httpClient.post(imdFeedbackUrl, HttpUtil.headers(), postBody, 1000L);
+                future.setHandler(res -> logger.info(res));
+            } catch (EncodeException e) {
+                logger.info(e);
+            }
         }
         return Future.succeededFuture(ampResponse);
     }

@@ -1,22 +1,42 @@
 adapters:
   rubicon:
     enabled: true
-    XAPI.Username: user1
-    XAPI.Password: password1
+    XAPI.Username: rubiuser
+    XAPI.Password: rubipw23
+  appnexus:
+    enabled: true
+  pubmatic:
+    enabled: true
+  sovrn:
+    enabled: true
+  openx:
+    enabled: true
+  lockerdome:
+    enabled: true
+  conversant:
+    enabled: true
 metrics:
   prefix: prebid
 cache:
   scheme: http
-  host: localhost
+  host: localhost:2424
   path: /cache
   query: uuid=
 settings:
   filesystem:
+    enabled: true
     settings-filename: sample/sample-app-settings.yaml
-    stored-requests-dir: /var/tmp
-    stored-imps-dir: /var/tmp
-    stored-responses-dir: /var/tmp
+    stored-requests-dir: sample/stored_requests
+    stored-imps-dir: sample/stored_requests
+    stored-responses-dir: sample/stored_requests
 gdpr:
   vendorlist:
     filesystem-cache-dir: /var/tmp
 status-response: "ok"
+analytics:
+  log:
+    enabled: true
+logger-level-modifier:
+  enabled: true
+adpushup:
+  imd-feedback-url: "http://localhost:8082/imd_feedback"
