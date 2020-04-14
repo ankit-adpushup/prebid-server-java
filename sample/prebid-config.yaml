@@ -39,4 +39,6 @@ analytics:
 logger-level-modifier:
   enabled: true
 adpushup:
-  imd-feedback-url: "http://localhost:8082/imd_feedback"
+  imd-feedback-host: "http://localhost:8082"
+  imd-feedback-endpoint: "/imd_feedback"
+  imd-feedback-creative-endpoint: "/creativecall"

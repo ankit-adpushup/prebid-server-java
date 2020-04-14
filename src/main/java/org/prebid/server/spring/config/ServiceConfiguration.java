@@ -545,10 +545,15 @@ public class ServiceConfiguration {
 
     @Primary
     @Bean
-    AmpResponsePostProcessor adpushupAmpResponsePostProcessor(@Value("${adpushup.imd-feedback-url}")
-                                                              String imdFeedbackUrl,
+    AmpResponsePostProcessor adpushupAmpResponsePostProcessor(@Value("${adpushup.imd-feedback-host}")
+                                                              String imdFeedbackHost,
+                                                              @Value("${adpushup.imd-feedback-endpoint}")
+                                                              String imdFeedbackEndpoint,
+                                                              @Value("${adpushup.imd-feedback-creative-endpoint}")
+                                                              String imdFeedbackCreativeEndpoint,
                                                               JacksonMapper mapper) {
-        return new AdpushupAmpResponsePostProcessor(imdFeedbackUrl, mapper);
+        return new AdpushupAmpResponsePostProcessor(imdFeedbackHost, imdFeedbackEndpoint, imdFeedbackCreativeEndpoint,
+                                                    mapper);
     }
 
     @Bean

@@ -28,14 +28,19 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private BasicHttpClient httpClient;
     private JacksonMapper mapper;
     private Logger logger;
-    private String imdFeedbackUrl;
+    private String imdFeedbackHost;
+    private String imdFeedbackEndpoint;
+    private String imdFeedbackCreativeEndpoint;
 
-    public AdpushupAmpResponsePostProcessor(String imdFeedbackUrl, JacksonMapper mapper) {
+    public AdpushupAmpResponsePostProcessor(String imdFeedbackHost, String imdFeedbackEndpoint,
+                                            String imdFeedbackCreativeEndpoint, JacksonMapper mapper) {
         this.logger = LoggerFactory.getLogger(AdpushupAmpResponsePostProcessor.class);
         this.vertx = Vertx.vertx();
         this.httpClient = new BasicHttpClient(vertx, vertx.createHttpClient());
         this.mapper = Objects.requireNonNull(mapper);
-        this.imdFeedbackUrl = imdFeedbackUrl;
+        this.imdFeedbackHost = imdFeedbackHost;
+        this.imdFeedbackEndpoint = imdFeedbackEndpoint;
+        this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
     }
 
     @Override
@@ -53,6 +58,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     newTargeting.put("hb_ap_cpm", TextNode.valueOf(sbid.getBid().get(0).getPrice().toString()));
                 }
             }
+            newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(imdFeedbackHost + imdFeedbackCreativeEndpoint));
             newTargeting.put("hb_ap_pb", TextNode.valueOf(newTargeting.remove("hb_pb").textValue()));
             try {
                 String json = mapper.encode(newTargeting);
@@ -61,8 +67,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 postBodyMap.put("targeting", json);
                 postBodyMap.put("bidResponse", bidResJson);
                 String postBody = mapper.encode(postBodyMap);
-                Future<?> future = httpClient.post(imdFeedbackUrl, HttpUtil.headers(), postBody, 1000L);
-                future.setHandler(res -> logger.info(res));
+                Future<?> future = httpClient.post(imdFeedbackHost + imdFeedbackEndpoint,
+                                                   HttpUtil.headers(), postBody, 1000L)
+                                                   .setHandler(res -> logger.info(res));
             } catch (EncodeException e) {
                 logger.info(e);
             }
