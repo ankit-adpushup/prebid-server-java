@@ -1,5 +1,8 @@
 package org.prebid.server.auction;
 
+import com.adpushup.e3.Database.DbManager;
+import com.adpushup.e3.Database.Cache.DbCacheManager;
+import com.couchbase.client.java.document.JsonDocument;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.iab.openrtb.request.BidRequest;
@@ -31,9 +34,12 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private String imdFeedbackHost;
     private String imdFeedbackEndpoint;
     private String imdFeedbackCreativeEndpoint;
+    private DbManager db;
+    private DbCacheManager dbCache;
 
     public AdpushupAmpResponsePostProcessor(String imdFeedbackHost, String imdFeedbackEndpoint,
-                                            String imdFeedbackCreativeEndpoint, JacksonMapper mapper) {
+                                            String imdFeedbackCreativeEndpoint, String[] ips, String cbUsername,
+                                            String cbPassword, JacksonMapper mapper) {
         this.logger = LoggerFactory.getLogger(AdpushupAmpResponsePostProcessor.class);
         this.vertx = Vertx.vertx();
         this.httpClient = new BasicHttpClient(vertx, vertx.createHttpClient());
@@ -41,12 +47,18 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackHost = imdFeedbackHost;
         this.imdFeedbackEndpoint = imdFeedbackEndpoint;
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
+        this.db = new DbManager(ips, cbUsername, cbPassword);
+        this.dbCache = new DbCacheManager(51200, 30000, db.getAppBucket(), db);
     }
 
     @Override
     public Future<AmpResponse> postProcess(BidRequest bidRequest, BidResponse bidResponse, AmpResponse ampResponse,
                                            RoutingContext context) {
+
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
+        String siteId = bidRequest.getSite().getId();
+        JsonDocument doc = dbCache.get(siteId);
+        logger.info(doc);
         if (!newTargeting.isEmpty()) {
             newTargeting.put("hb_ap_id", TextNode.valueOf(UUID.randomUUID().toString()));
             newTargeting.put("hb_ap_bidder", TextNode.valueOf(newTargeting.remove("hb_bidder").asText()));

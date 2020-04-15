@@ -262,6 +262,23 @@
             <artifactId>geoip2</artifactId>
             <version>${maxmind-client.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.adpushup.e3</groupId>
+            <artifactId>Database</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mule.com.github.stephenc.eaio-uuid</groupId>
+            <artifactId>eaio-uuid</artifactId>
+            <version>3.4.2-MULE-002-SNAPSHOT</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>com.couchbase.client</groupId>
+            <artifactId>java-client</artifactId>
+            <version>2.6.2</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>junit</groupId>

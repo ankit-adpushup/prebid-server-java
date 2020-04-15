@@ -551,9 +551,15 @@ public class ServiceConfiguration {
                                                               String imdFeedbackEndpoint,
                                                               @Value("${adpushup.imd-feedback-creative-endpoint}")
                                                               String imdFeedbackCreativeEndpoint,
+                                                              @Value("${adpushup.customConfig.couchbase-ips}")
+                                                              String[] ips,
+                                                              @Value("${adpushup.customConfig.couchbase-username}")
+                                                              String cbUsername,
+                                                              @Value("${adpushup.customConfig.couchbase-password}")
+                                                              String cbPassword,
                                                               JacksonMapper mapper) {
         return new AdpushupAmpResponsePostProcessor(imdFeedbackHost, imdFeedbackEndpoint, imdFeedbackCreativeEndpoint,
-                                                    mapper);
+                                                    ips, cbUsername, cbPassword, mapper);
     }
 
     @Bean
