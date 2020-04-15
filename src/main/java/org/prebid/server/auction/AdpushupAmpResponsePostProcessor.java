@@ -48,7 +48,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackEndpoint = imdFeedbackEndpoint;
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
-        this.dbCache = new DbCacheManager(51200, 30000, db.getAppBucket(), db);
+        this.dbCache = new DbCacheManager(51200, 30000, db.getNewAppBucket(), db);
     }
 
     @Override
@@ -56,8 +56,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                                            RoutingContext context) {
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
-        String siteId = bidRequest.getSite().getId();
-        JsonDocument doc = dbCache.get(siteId);
+        String requestId = bidRequest.getId();
+        JsonDocument doc = dbCache.get(requestId);
         logger.info(doc);
         if (!newTargeting.isEmpty()) {
             newTargeting.put("hb_ap_id", TextNode.valueOf(UUID.randomUUID().toString()));
