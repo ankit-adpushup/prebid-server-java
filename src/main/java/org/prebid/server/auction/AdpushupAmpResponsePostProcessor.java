@@ -19,6 +19,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
         this.dbCache = new DbCacheManager(51200, 30000, db.getNewAppBucket(), db);
+        ArrayList<JsonDocument> docList = dbCache.queryAndSetCustomData();
+        logger.info(docList);
     }
 
     @Override
@@ -57,8 +60,12 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
         String requestId = bidRequest.getId();
-        JsonDocument doc = dbCache.get(requestId);
-        logger.info(doc);
+        String siteId = requestId.split(":", 2)[0];
+        JsonDocument customData = dbCache.getCustom(siteId);
+        logger.info(customData.content().get("ownerEmail").toString());
+        logger.info(customData.content().get("prebidGranularityMultiplier").toString());
+        logger.info(customData.content().get("revenueShare")); // Another JsonObject
+
         if (!newTargeting.isEmpty()) {
             newTargeting.put("hb_ap_id", TextNode.valueOf(UUID.randomUUID().toString()));
             newTargeting.put("hb_ap_bidder", TextNode.valueOf(newTargeting.remove("hb_bidder").asText()));
