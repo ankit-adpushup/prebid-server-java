@@ -1,16 +1,13 @@
 package com.adpushup.e3.Database.Cache;
 
 import com.adpushup.e3.Database.DbManager;
+import com.adpushup.e3.Database.Callback;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.document.JsonDocument;
-import com.couchbase.client.java.document.json.JsonObject;
-import com.couchbase.client.java.query.N1qlQuery;
-import com.couchbase.client.java.query.N1qlQueryRow;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -80,45 +77,20 @@ public class DbCacheManager {
     public JsonDocument getCustom(String id) {
         CachedDocument cachedDoc = _cache.get(id);
         if (cachedDoc == null) {
-            this.queryAndSetCustomData();
-            cachedDoc = _cache.get(id);
+            return null; // TODO handle what happens if cachedDoc is null
         }
         return cachedDoc.getJsonDocument();
     }
 
-    public void set(String id, JsonDocument jsonDoc) {
-        CachedDocument cachedDoc = new CachedDocument(id, jsonDoc, DEFAULT_DOC_TTL, true);
+    public void set(String id, JsonDocument jsonDoc, Callback func) {
+        CachedDocument cachedDoc = new CachedDocument(id, jsonDoc, DEFAULT_DOC_TTL, true, func);
         _cache.putIfAbsent(id, cachedDoc);
     }
 
-    public ArrayList<JsonDocument> queryAndSetCustomData() {
-        String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
-        String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier FROM `AppBucket`"
-                + " WHERE meta().id = 'user::%s';";
-        String query3 = "SELECT RAW hbcf from `AppBucket` WHERE meta().id = 'hbdc::%s';";
-        JsonObject jsonObj;
-        JsonDocument jsonDoc;
-        ArrayList<JsonDocument> docList = new ArrayList<JsonDocument>();
-        for (N1qlQueryRow row : _bucket.query(N1qlQuery.simple(query1))) {
-            jsonObj = row.value();
-            String siteId = jsonObj.get("siteId").toString();
-            for (N1qlQueryRow i : _bucket
-                    .query(N1qlQuery.simple(String.format(query2, jsonObj.get("ownerEmail").toString())))) {
-                jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
-            }
-            for (N1qlQueryRow j : _bucket
-                    .query(N1qlQuery.simple(String.format(query3, jsonObj.get("siteId").toString())))) {
-                JsonObject hbcf = j.value();
-                JsonObject revShareObj = JsonObject.create();
-                Set<String> bidderNames = hbcf.getNames();
-                for (String bidder : bidderNames) {
-                    revShareObj.put(bidder, ((JsonObject) hbcf.get(bidder)).get("revenueShare"));
-                }
-                jsonObj.put("revenueShare", revShareObj);
-            }
-            jsonDoc = JsonDocument.create(jsonObj.get("siteId").toString(), jsonObj);
-            docList.add(jsonDoc);
-            set(siteId, jsonDoc);
+    public ArrayList<JsonDocument> queryAndSetCustomData(Callback func) {
+        ArrayList<JsonDocument> docList = func.call(_bucket);
+        for (JsonDocument doc: docList) {
+            set(doc.content().get("siteId").toString(), doc, func);
         }
         return docList;
     }
@@ -225,33 +197,7 @@ public class DbCacheManager {
                                 }
                             } else {
                                 if (!customDataFetched) {
-                                    String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
-                                    String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier FROM `AppBucket`"
-                                            + " WHERE meta().id like 'user::%' AND email='%s';";
-                                    String query3 = "SELECT RAW hbcf from `AppBucket` WHERE meta().id = 'hbdc::%s';";
-                                    JsonObject jsonObj;
-                                    JsonDocument jsonDoc;
-                                    for (N1qlQueryRow row : _bucket.query(N1qlQuery.simple(query1))) {
-                                        jsonObj = row.value();
-                                        for (N1qlQueryRow row2 : _bucket.query(N1qlQuery
-                                                .simple(String.format(query2, jsonObj.get("ownerEmail").toString())))) {
-                                            jsonObj.put("prebidGranularityMultiplier",
-                                                    row2.value().get("prebidGranularityMultiplier"));
-                                        }
-                                        for (N1qlQueryRow row3 : _bucket.query(N1qlQuery
-                                                .simple(String.format(query3, jsonObj.get("siteId").toString())))) {
-                                            JsonObject hbcf = row3.value();
-                                            JsonObject revShareObj = JsonObject.create();
-                                            Set<String> bidderNames = hbcf.getNames();
-                                            for (String bidder : bidderNames) {
-                                                revShareObj.put(bidder,
-                                                        ((JsonObject) hbcf.get(bidder)).get("revenueShare"));
-                                            }
-                                            jsonObj.put("revenueShare", revShareObj);
-                                        }
-                                        jsonDoc = JsonDocument.create(jsonObj.get("siteId").toString(), jsonObj);
-                                        fetchedData.add(jsonDoc);
-                                    }
+                                    fetchedData = cachedItem.func.call(_bucket);
                                 }
                                 for (JsonDocument doc : fetchedData) {
                                     if (doc.id() == cachedItem.getId()) {

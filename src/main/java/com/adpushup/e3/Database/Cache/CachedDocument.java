@@ -1,5 +1,6 @@
 package com.adpushup.e3.Database.Cache;
 
+import com.adpushup.e3.Database.Callback;
 import com.couchbase.client.java.document.JsonDocument;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -11,6 +12,7 @@ class CachedDocument {
     private long _expiry;
     private final AtomicInteger _frequency;
     private boolean _customData;
+    public Callback func;
 
     CachedDocument(String id, JsonDocument jsonDoc, long ttl) {
         _id = id;
@@ -20,13 +22,14 @@ class CachedDocument {
         _frequency = new AtomicInteger(1);
     }
 
-    CachedDocument(String id, JsonDocument jsonDoc, long ttl, boolean customData) {
+    CachedDocument(String id, JsonDocument jsonDoc, long ttl, boolean customData, Callback func) {
         _id = id;
         _jsonDoc = jsonDoc;
 
         _expiry = System.currentTimeMillis() + ttl;
         _frequency = new AtomicInteger(1);
         _customData = customData;
+        this.func = func;
     }
 
     public boolean isExpired() {
