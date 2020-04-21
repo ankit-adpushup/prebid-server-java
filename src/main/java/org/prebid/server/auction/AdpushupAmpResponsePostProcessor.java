@@ -105,17 +105,21 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         }
 
         if (!newTargeting.isEmpty()) {
-            newTargeting.put("hb_ap_id", TextNode.valueOf(UUID.randomUUID().toString()));
+            String uuid = UUID.randomUUID().toString();
             newTargeting.put("hb_ap_bidder", TextNode.valueOf(newTargeting.remove("hb_bidder").asText()));
-            newTargeting.put("hb_ap_size", TextNode.valueOf(newTargeting.remove("hb_size").asText()));
+            newTargeting.put("hb_ap_ran", TextNode.valueOf("1"));
+            newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
+            newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
             List<SeatBid> sbids = bidResponse.getSeatbid();
             String winningBidder = newTargeting.get("hb_ap_bidder").textValue();
             for (SeatBid sbid : sbids) {
                 if (sbid.getSeat() == winningBidder) {
                     newTargeting.put("hb_ap_cpm", TextNode.valueOf(sbid.getBid().get(0).getPrice().toString()));
+                    newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                 }
             }
-            newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(imdFeedbackHost + imdFeedbackCreativeEndpoint));
+            String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint, uuid, siteId);
+            newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
             newTargeting.put("hb_ap_pb", TextNode.valueOf(newTargeting.remove("hb_pb").textValue()));
             try {
                 String json = mapper.encode(newTargeting);
