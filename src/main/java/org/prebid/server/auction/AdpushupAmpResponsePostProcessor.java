@@ -4,6 +4,7 @@ import com.adpushup.e3.Database.DbManager;
 import com.adpushup.e3.Database.Cache.DbCacheManager;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.document.JsonDocument;
+import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
 import com.couchbase.client.java.query.N1qlQuery;
 import com.couchbase.client.java.query.N1qlQueryRow;
@@ -23,6 +24,9 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -92,13 +96,33 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             RoutingContext context) {
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
+        String priceGranularityJson = "{" +
+            "\"ranges\": [" +
+              "{" +
+                "\"max\": 10.00," +
+                "\"min\": 0.10," +
+                "\"increment\": 0.10" +
+              "}," +
+              "{" +
+                "\"max\": 20.00," +
+                "\"min\": 10.50," +
+                "\"increment\": 0.50" +
+              "}" +
+            "]"+
+          "}";
+        JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
+        JsonArray rangesArray = priceGranularityObject.getArray("ranges");       
         String requestId = bidRequest.getId();
         String siteId = requestId.split(":", 2)[0];
+        JsonObject revShare = JsonObject.create();
+        float granularityMultiplier = 1;
         try {
             JsonDocument customData = dbCache.getCustom(siteId);
+            revShare = (JsonObject) customData.content().get("revenueShare");
+            granularityMultiplier = Float.parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
             logger.info(customData.content().get("ownerEmail").toString());
             logger.info(customData.content().get("prebidGranularityMultiplier").toString());
-            logger.info(customData.content().get("revenueShare")); // Another JsonObject
+            logger.info(revShare); // Another JsonObject
         } catch (NullPointerException e) {
             logger.info(e);
             logger.info("NullPointerException while getting data from cache");
@@ -106,25 +130,54 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
         if (!newTargeting.isEmpty()) {
             String uuid = UUID.randomUUID().toString();
-            newTargeting.put("hb_ap_bidder", TextNode.valueOf(newTargeting.remove("hb_bidder").asText()));
+            String winningBidder = newTargeting.remove("hb_bidder").asText();
+            int winningBidderRevShare;
+            try {
+                winningBidderRevShare = Integer.parseInt((String) revShare.get(winningBidder));
+            } catch (NumberFormatException e) {
+                winningBidderRevShare = 0;
+            }
+            newTargeting.put("hb_ap_bidder", TextNode.valueOf(winningBidder));
             newTargeting.put("hb_ap_ran", TextNode.valueOf("1"));
             newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
             newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
+            newTargeting.remove("hb_pb");
             List<SeatBid> sbids = bidResponse.getSeatbid();
-            String winningBidder = newTargeting.get("hb_ap_bidder").textValue();
             for (SeatBid sbid : sbids) {
                 if (sbid.getSeat() == winningBidder) {
-                    newTargeting.put("hb_ap_cpm", TextNode.valueOf(sbid.getBid().get(0).getPrice().toString()));
+                    float originalCpm = sbid.getBid().get(0).getPrice().floatValue();
+                    // BigDecimal adjustedCpm = originalCpm.subtract(originalCpm.multiply(BigDecimal.valueOf(winningBidderRevShare)).divide(BigDecimal.valueOf(100)));
+                    float adjustedCpm = originalCpm - (originalCpm*winningBidderRevShare/100);
+                    float max;
+                    float min;
+                    float increment;
+                    float pb = 0;
+                    for (Object s: rangesArray) {
+                        max = Float.parseFloat(((JsonObject) s).get("max").toString());
+                        min = Float.parseFloat(((JsonObject) s).get("min").toString());
+                        increment = Float.parseFloat(((JsonObject) s).get("increment").toString());
+                        
+                        if (adjustedCpm < max && adjustedCpm >= min) {
+                            float difference = adjustedCpm - min;
+                            pb = min + (increment * Math.round(difference/increment));
+                        }
+                    }
+                    
+                    DecimalFormat df = new DecimalFormat("0.00");
+                    df.setRoundingMode(RoundingMode.DOWN);
+                    String apPb = df.format(pb*granularityMultiplier);
+                    newTargeting.put("hp_ap_pb", TextNode.valueOf(apPb));
+                    newTargeting.put("hb_ap_cpm", TextNode.valueOf(Float.toString(adjustedCpm)));
                     newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                 }
             }
             String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint, uuid, siteId);
             newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
-            newTargeting.put("hb_ap_pb", TextNode.valueOf(newTargeting.remove("hb_pb").textValue()));
             try {
                 String json = mapper.encode(newTargeting);
                 String bidResJson = mapper.encode(bidResponse);
                 Map<String, String> postBodyMap = new HashMap<String, String>();
+                postBodyMap.put("uuid", uuid);
                 postBodyMap.put("targeting", json);
                 postBodyMap.put("bidResponse", bidResJson);
                 String postBody = mapper.encode(postBodyMap);
