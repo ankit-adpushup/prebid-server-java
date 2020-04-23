@@ -88,7 +88,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             }
             return list;
         });
-        logger.info(docList);
     }
 
     @Override
@@ -96,26 +95,34 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             RoutingContext context) {
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
-        String priceGranularityJson = "{" +
-            "\"ranges\": [" +
-              "{" +
-                "\"max\": 10.00," +
-                "\"min\": 0.10," +
-                "\"increment\": 0.10" +
-              "}," +
-              "{" +
-                "\"max\": 20.00," +
-                "\"min\": 10.50," +
-                "\"increment\": 0.50" +
-              "}" +
-            "]"+
-          "}";
+        String priceGranularityJson = "{"+
+            "\"precision\": 2," +
+            "\"ranges\": ["+
+                "{"+
+                    "\"min\": 0," +
+                    "\"max\": 3," +
+                    "\"increment\": 0.01" +
+                "}," +
+                "{" +
+                    "\"min\": 3," +
+                    "\"max\": 8," +
+                    "\"increment\": 0.05" +
+                "},"+
+                "{" +
+                    "\"min\": 8," +
+                    "\"max\": 20," +
+                    "\"increment\": 0.5" +
+                "}" +
+            "]" +
+        "}";
         JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
+        int pbPrecision = priceGranularityObject.getInt("precision");
         JsonArray rangesArray = priceGranularityObject.getArray("ranges");       
         String requestId = bidRequest.getId();
         String siteId = requestId.split(":", 2)[0];
         JsonObject revShare = JsonObject.create();
         float granularityMultiplier = 1;
+
         try {
             JsonDocument customData = dbCache.getCustom(siteId);
             revShare = (JsonObject) customData.content().get("revenueShare");
@@ -142,11 +149,11 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
             newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
             newTargeting.remove("hb_pb");
+            float pow = (float) Math.pow(10, pbPrecision+2);
             List<SeatBid> sbids = bidResponse.getSeatbid();
             for (SeatBid sbid : sbids) {
                 if (sbid.getSeat() == winningBidder) {
                     float originalCpm = sbid.getBid().get(0).getPrice().floatValue();
-                    // BigDecimal adjustedCpm = originalCpm.subtract(originalCpm.multiply(BigDecimal.valueOf(winningBidderRevShare)).divide(BigDecimal.valueOf(100)));
                     float adjustedCpm = originalCpm - (originalCpm*winningBidderRevShare/100);
                     float max;
                     float min;
@@ -156,10 +163,10 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         max = Float.parseFloat(((JsonObject) s).get("max").toString());
                         min = Float.parseFloat(((JsonObject) s).get("min").toString());
                         increment = Float.parseFloat(((JsonObject) s).get("increment").toString());
-                        
                         if (adjustedCpm < max && adjustedCpm >= min) {
-                            float difference = adjustedCpm - min;
-                            pb = min + (increment * Math.round(difference/increment));
+                            float cpmToFloor = ((adjustedCpm*pow) - (min*pow))/(increment*pow);
+                            pb = min + (increment * Math.round(cpmToFloor));
+                            break;
                         }
                     }
                     
