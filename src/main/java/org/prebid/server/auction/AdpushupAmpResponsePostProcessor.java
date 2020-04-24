@@ -61,9 +61,10 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.dbCache = new DbCacheManager(51200, 30000, db.getNewAppBucket(), db);
         ArrayList<JsonDocument> docList = dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
-            String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier FROM `AppBucket`"
+            String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
                     + " WHERE meta().id = 'user::%s';";
             String query3 = "SELECT RAW hbcf from `AppBucket` WHERE meta().id = 'hbdc::%s';";
+            String query4 = "SELECT id, name FROM `AppBucket` WHERE meta().id like 'amtg::%%' AND siteId = %s";
             JsonObject jsonObj;
             JsonDocument jsonDoc;
             ArrayList<JsonDocument> list = new ArrayList<JsonDocument>();
@@ -73,6 +74,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 for (N1qlQueryRow i : _bucket
                         .query(N1qlQuery.simple(String.format(query2, jsonObj.get("ownerEmail").toString())))) {
                     jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
+                    jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
+
                 }
                 for (N1qlQueryRow j : _bucket.query(N1qlQuery.simple(String.format(query3, siteId)))) {
                     JsonObject hbcf = j.value();
@@ -83,9 +86,14 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     }
                     jsonObj.put("revenueShare", revShareObj);
                 }
+                for (N1qlQueryRow k: _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
+                    jsonObj.put("sectionId", k.value().get("id"));
+                    jsonObj.put("sectionName", k.value().get("name"));
+                }
                 jsonDoc = JsonDocument.create(siteId, jsonObj);
                 list.add(jsonDoc);
             }
+            logger.info(list);
             return list;
         });
     }
@@ -120,6 +128,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         JsonArray rangesArray = priceGranularityObject.getArray("ranges");       
         String requestId = bidRequest.getId();
         String siteId = requestId.split(":", 2)[0];
+        String sectionId = "";
+        String sectionName = "";
+        String activeDfpCurrencyCode = "USD";
         JsonObject revShare = JsonObject.create();
         float granularityMultiplier = 1;
 
@@ -127,8 +138,14 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             JsonDocument customData = dbCache.getCustom(siteId);
             revShare = (JsonObject) customData.content().get("revenueShare");
             granularityMultiplier = Float.parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
+            sectionId = customData.content().get("sectionId").toString();
+            sectionName = customData.content().get("sectionName").toString();
+            activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
+
             logger.info(customData.content().get("ownerEmail").toString());
             logger.info(customData.content().get("prebidGranularityMultiplier").toString());
+            logger.info(sectionId);
+            logger.info(sectionName);
             logger.info(revShare); // Another JsonObject
         } catch (NullPointerException e) {
             logger.info(e);
@@ -159,6 +176,15 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     float min;
                     float increment;
                     float pb = 0;
+                    JsonObject largestBucket = (JsonObject) rangesArray.get(-1);
+                    float largestMax = Float.parseFloat(largestBucket.get("max").toString());
+                    if(adjustedCpm > largestMax) {
+                        max = largestMax;
+                        min = Float.parseFloat(largestBucket.get("min").toString());
+                        increment = Float.parseFloat(largestBucket.get("increment").toString());
+                        float cpmToFloor = ((adjustedCpm*pow) - (min*pow))/(increment*pow);
+                        pb = min + (increment * Math.round(cpmToFloor));
+                    }
                     for (Object s: rangesArray) {
                         max = Float.parseFloat(((JsonObject) s).get("max").toString());
                         min = Float.parseFloat(((JsonObject) s).get("min").toString());
@@ -185,6 +211,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 String bidResJson = mapper.encode(bidResponse);
                 Map<String, String> postBodyMap = new HashMap<String, String>();
                 postBodyMap.put("uuid", uuid);
+                postBodyMap.put("sectionId", sectionId);
+                postBodyMap.put("sectionName", sectionName);
+                postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
                 postBodyMap.put("targeting", json);
                 postBodyMap.put("bidResponse", bidResJson);
                 String postBody = mapper.encode(postBodyMap);
