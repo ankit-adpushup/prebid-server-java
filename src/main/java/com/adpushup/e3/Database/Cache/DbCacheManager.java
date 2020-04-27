@@ -4,6 +4,10 @@ import com.adpushup.e3.Database.DbManager;
 import com.adpushup.e3.Database.Callback;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.document.JsonDocument;
+
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -26,6 +30,7 @@ public class DbCacheManager {
 
     private final Timer _cacheMaintenanceTimer = new Timer();
     private CacheMaintenanceTask _currentTask;
+    private Logger logger = LoggerFactory.getLogger(DbCacheManager.class);
 
     // Used in stats
     private int _averageCacheSize = 0;
@@ -172,10 +177,11 @@ public class DbCacheManager {
 
                     if (cachedItem.isExpired()) {
                         try {
-                            if (cachedItem.getFrequency() == 0) {
-                                _cache.remove(cachedItem.getId());
-                                continue;
-                            }
+                            // if (cachedItem.getFrequency() == 0) {
+                            //     logger.info("CachedItem Removed");
+                            //     _cache.remove(cachedItem.getId());
+                            //     continue;
+                            // }
 
                             if (!cachedItem.isCustomData()) {
                                 JsonDocument jsonDoc = _bucket.get(cachedItem.getId(), 10, TimeUnit.SECONDS);
@@ -198,6 +204,7 @@ public class DbCacheManager {
                             } else {
                                 if (!customDataFetched) {
                                     fetchedData = cachedItem.func.call(_bucket);
+                                    customDataFetched = true;
                                 }
                                 for (JsonDocument doc : fetchedData) {
                                     if (doc.id() == cachedItem.getId()) {
