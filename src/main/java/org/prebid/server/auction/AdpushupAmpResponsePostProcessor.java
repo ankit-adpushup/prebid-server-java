@@ -60,7 +60,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
         this.dbCache = new DbCacheManager(51200, 30000 , db.getNewAppBucket(), db);
-        ArrayList<JsonDocument> docList = dbCache.queryAndSetCustomData(_bucket -> {
+        dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
                     + " WHERE meta().id = 'user::%s';";
