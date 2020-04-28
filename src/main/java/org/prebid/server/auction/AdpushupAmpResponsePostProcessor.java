@@ -2,7 +2,7 @@ package org.prebid.server.auction;
 
 import com.adpushup.e3.Database.DbManager;
 import com.adpushup.e3.Database.Cache.DbCacheManager;
-import com.couchbase.client.java.Bucket;
+import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
@@ -59,7 +59,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackEndpoint = imdFeedbackEndpoint;
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
-        this.dbCache = new DbCacheManager(51200, 30000, db.getNewAppBucket(), db);
+        this.dbCache = new DbCacheManager(51200, 30000 , db.getNewAppBucket(), db);
         ArrayList<JsonDocument> docList = dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
@@ -69,50 +69,51 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             JsonObject jsonObj;
             JsonDocument jsonDoc;
             ArrayList<JsonDocument> list = new ArrayList<JsonDocument>();
-            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-            logger.info("starting to cache custom data");
-            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-            for (N1qlQueryRow row : _bucket.query(N1qlQuery.simple(query1))) {
-                jsonObj = row.value();
-                if(jsonObj == null) {
-                    logger.info("jsonObj is null");
-                    continue;
-                }
-                String siteId = Objects.toString(jsonObj.get("siteId"), "");
-                String ownerEmail = Objects.toString(jsonObj.get("ownerEmail"), "");
-                if(siteId.isEmpty()) {
-                    logger.info("siteId is null or empty");
-                    continue;
-                }
-                if(ownerEmail.isEmpty()) {
-                    logger.info("ownerEmail is null or empty");
-                    continue;
-                }
-                N1qlQueryResult userDocResult = _bucket.query(N1qlQuery.simple(String.format(query2, ownerEmail)));
-                List <N1qlQueryRow> rows = userDocResult.allRows();
-                if(rows.size() == 0) {
-                    logger.info("No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail);
-                    continue;
-                }
-                N1qlQueryRow i = rows.get(0);
-                jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
-                jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
-
-                for (N1qlQueryRow j : _bucket.query(N1qlQuery.simple(String.format(query3, siteId)))) {
-                    JsonObject hbcf = j.value();
-                    JsonObject revShareObj = JsonObject.create();
-                    Set<String> bidderNames = hbcf.getNames();
-                    for (String bidder : bidderNames) {
-                        revShareObj.put(bidder, ((JsonObject) hbcf.get(bidder)).get("revenueShare"));
+            try {
+                for (N1qlQueryRow row : _bucket.query(N1qlQuery.simple(query1))) {
+                    jsonObj = row.value();
+                    if(jsonObj == null) {
+                        logger.info("jsonObj is null");
+                        continue;
                     }
-                    jsonObj.put("revenueShare", revShareObj);
+                    String siteId = Objects.toString(jsonObj.get("siteId"), "");
+                    String ownerEmail = Objects.toString(jsonObj.get("ownerEmail"), "");
+                    if(siteId.isEmpty()) {
+                        logger.info("siteId is null or empty");
+                        continue;
+                    }
+                    if(ownerEmail.isEmpty()) {
+                        logger.info("ownerEmail is null or empty");
+                        continue;
+                    }
+                    N1qlQueryResult userDocResult = _bucket.query(N1qlQuery.simple(String.format(query2, ownerEmail)));
+                    List <N1qlQueryRow> rows = userDocResult.allRows();
+                    if(rows.size() == 0) {
+                        logger.info("No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail);
+                        continue;
+                    }
+                    N1qlQueryRow i = rows.get(0);
+                    jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
+                    jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
+    
+                    for (N1qlQueryRow j : _bucket.query(N1qlQuery.simple(String.format(query3, siteId)))) {
+                        JsonObject hbcf = j.value();
+                        JsonObject revShareObj = JsonObject.create();
+                        Set<String> bidderNames = hbcf.getNames();
+                        for (String bidder : bidderNames) {
+                            revShareObj.put(bidder, ((JsonObject) hbcf.get(bidder)).get("revenueShare"));
+                        }
+                        jsonObj.put("revenueShare", revShareObj);
+                    }
+                    for (N1qlQueryRow k: _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
+                        jsonObj.put("sectionId", k.value().get("id"));
+                        jsonObj.put("sectionName", k.value().get("name"));
+                    }
+                    jsonDoc = JsonDocument.create(siteId, jsonObj);
+                    list.add(jsonDoc);
                 }
-                for (N1qlQueryRow k: _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
-                    jsonObj.put("sectionId", k.value().get("id"));
-                    jsonObj.put("sectionName", k.value().get("name"));
-                }
-                jsonDoc = JsonDocument.create(siteId, jsonObj);
-                list.add(jsonDoc);
+            } catch (CouchbaseException e) {
+                logger.info(e);
             }
             logger.info(list);
             return list;
@@ -124,29 +125,12 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             RoutingContext context) {
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
-        String priceGranularityJson = "{"+
-            "\"precision\": 2," +
-            "\"ranges\": ["+
-                "{"+
-                    "\"min\": 0," +
-                    "\"max\": 3," +
-                    "\"increment\": 0.01" +
-                "}," +
-                "{" +
-                    "\"min\": 3," +
-                    "\"max\": 8," +
-                    "\"increment\": 0.05" +
-                "},"+
-                "{" +
-                    "\"min\": 8," +
-                    "\"max\": 20," +
-                    "\"increment\": 0.5" +
-                "}" +
-            "]" +
-        "}";
+        String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0," + "\"max\": 3,"
+                + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8," + "\"increment\": 0.05" + "},"
+                + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}" + "]" + "}";
         JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
         int pbPrecision = priceGranularityObject.getInt("precision");
-        JsonArray rangesArray = priceGranularityObject.getArray("ranges");       
+        JsonArray rangesArray = priceGranularityObject.getArray("ranges");
         String requestId = bidRequest.getId();
         String siteId = requestId.split(":", 2)[0];
         String sectionId = "";
@@ -158,7 +142,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         try {
             JsonDocument customData = dbCache.getCustom(siteId);
             revShare = (JsonObject) customData.content().get("revenueShare");
-            granularityMultiplier = Float.parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
+            granularityMultiplier = Float
+                    .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
             sectionId = customData.content().get("sectionId").toString();
             sectionName = customData.content().get("sectionName").toString();
             activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
@@ -187,45 +172,46 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
             newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
             newTargeting.remove("hb_pb");
-            float pow = (float) Math.pow(10, pbPrecision+2);
+            float pow = (float) Math.pow(10, pbPrecision + 2);
             List<SeatBid> sbids = bidResponse.getSeatbid();
             for (SeatBid sbid : sbids) {
                 if (sbid.getSeat() == winningBidder) {
                     float originalCpm = sbid.getBid().get(0).getPrice().floatValue();
-                    float adjustedCpm = originalCpm - (originalCpm*winningBidderRevShare/100);
+                    float adjustedCpm = originalCpm - (originalCpm * winningBidderRevShare / 100);
                     float max;
                     float min;
                     float increment;
                     float pb = 0;
-                    JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() -1);
+                    JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() - 1);
                     float largestMax = Float.parseFloat(largestBucket.get("max").toString());
-                    if(adjustedCpm > largestMax) {
+                    if (adjustedCpm > largestMax) {
                         max = largestMax;
                         min = Float.parseFloat(largestBucket.get("min").toString());
                         increment = Float.parseFloat(largestBucket.get("increment").toString());
-                        float cpmToFloor = ((adjustedCpm*pow) - (min*pow))/(increment*pow);
+                        float cpmToFloor = ((adjustedCpm * pow) - (min * pow)) / (increment * pow);
                         pb = min + (increment * Math.round(cpmToFloor));
                     }
-                    for (Object s: rangesArray) {
+                    for (Object s : rangesArray) {
                         max = Float.parseFloat(((JsonObject) s).get("max").toString());
                         min = Float.parseFloat(((JsonObject) s).get("min").toString());
                         increment = Float.parseFloat(((JsonObject) s).get("increment").toString());
                         if (adjustedCpm < max && adjustedCpm >= min) {
-                            float cpmToFloor = ((adjustedCpm*pow) - (min*pow))/(increment*pow);
+                            float cpmToFloor = ((adjustedCpm * pow) - (min * pow)) / (increment * pow);
                             pb = min + (increment * Math.round(cpmToFloor));
                             break;
                         }
                     }
-                    
+
                     DecimalFormat df = new DecimalFormat("0.00");
                     df.setRoundingMode(RoundingMode.DOWN);
-                    String apPb = df.format(pb*granularityMultiplier);
+                    String apPb = df.format(pb * granularityMultiplier);
                     newTargeting.put("hp_ap_pb", TextNode.valueOf(apPb));
                     newTargeting.put("hb_ap_cpm", TextNode.valueOf(Float.toString(adjustedCpm)));
                     newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                 }
             }
-            String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint, uuid, siteId);
+            String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint, uuid,
+                    siteId);
             newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
             try {
                 String json = mapper.encode(newTargeting);
