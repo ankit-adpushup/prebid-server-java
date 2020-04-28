@@ -7,6 +7,7 @@ import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
 import com.couchbase.client.java.query.N1qlQuery;
+import com.couchbase.client.java.query.N1qlQueryResult;
 import com.couchbase.client.java.query.N1qlQueryRow;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.TextNode;
@@ -68,15 +69,35 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             JsonObject jsonObj;
             JsonDocument jsonDoc;
             ArrayList<JsonDocument> list = new ArrayList<JsonDocument>();
+            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            logger.info("starting to cache custom data");
+            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
             for (N1qlQueryRow row : _bucket.query(N1qlQuery.simple(query1))) {
                 jsonObj = row.value();
-                String siteId = jsonObj.get("siteId").toString();
-                for (N1qlQueryRow i : _bucket
-                        .query(N1qlQuery.simple(String.format(query2, jsonObj.get("ownerEmail").toString())))) {
-                    jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
-                    jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
-
+                if(jsonObj == null) {
+                    logger.info("jsonObj is null");
+                    continue;
                 }
+                String siteId = Objects.toString(jsonObj.get("siteId"), "");
+                String ownerEmail = Objects.toString(jsonObj.get("ownerEmail"), "");
+                if(siteId.isEmpty()) {
+                    logger.info("siteId is null or empty");
+                    continue;
+                }
+                if(ownerEmail.isEmpty()) {
+                    logger.info("ownerEmail is null or empty");
+                    continue;
+                }
+                N1qlQueryResult userDocResult = _bucket.query(N1qlQuery.simple(String.format(query2, ownerEmail)));
+                List <N1qlQueryRow> rows = userDocResult.allRows();
+                if(rows.size() == 0) {
+                    logger.info("No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail);
+                    continue;
+                }
+                N1qlQueryRow i = rows.get(0);
+                jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
+                jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
+
                 for (N1qlQueryRow j : _bucket.query(N1qlQuery.simple(String.format(query3, siteId)))) {
                     JsonObject hbcf = j.value();
                     JsonObject revShareObj = JsonObject.create();
@@ -157,7 +178,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String winningBidder = newTargeting.remove("hb_bidder").asText();
             int winningBidderRevShare;
             try {
-                winningBidderRevShare = Integer.parseInt((String) revShare.get(winningBidder));
+                winningBidderRevShare = Integer.parseInt(revShare.get(winningBidder).toString());
             } catch (NumberFormatException e) {
                 winningBidderRevShare = 0;
             }
@@ -176,7 +197,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     float min;
                     float increment;
                     float pb = 0;
-                    JsonObject largestBucket = (JsonObject) rangesArray.get(-1);
+                    JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() -1);
                     float largestMax = Float.parseFloat(largestBucket.get("max").toString());
                     if(adjustedCpm > largestMax) {
                         max = largestMax;
