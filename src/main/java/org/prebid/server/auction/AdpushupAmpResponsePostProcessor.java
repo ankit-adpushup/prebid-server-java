@@ -26,6 +26,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -59,7 +60,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackEndpoint = imdFeedbackEndpoint;
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
-        this.dbCache = new DbCacheManager(51200, 30000 , db.getNewAppBucket(), db);
+        this.dbCache = new DbCacheManager(51200, 30000, db.getNewAppBucket(), db);
         ArrayList<JsonDocument> docList = dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
@@ -87,7 +88,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         }
                         jsonObj.put("revenueShare", revShareObj);
                     }
-                    for (N1qlQueryRow k: _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
+                    for (N1qlQueryRow k : _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
                         jsonObj.put("sectionId", k.value().get("id"));
                         jsonObj.put("sectionName", k.value().get("name"));
                     }
@@ -107,111 +108,121 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             RoutingContext context) {
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
-        String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0," + "\"max\": 3,"
-                + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8," + "\"increment\": 0.05" + "},"
-                + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}" + "]" + "}";
-        JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
-        int pbPrecision = priceGranularityObject.getInt("precision");
-        JsonArray rangesArray = priceGranularityObject.getArray("ranges");
-        String requestId = bidRequest.getId();
-        String siteId = requestId.split(":", 2)[0];
-        String sectionId = "";
-        String sectionName = "";
-        String activeDfpCurrencyCode = "USD";
-        JsonObject revShare = JsonObject.create();
-        float granularityMultiplier = 1;
-
         try {
-            JsonDocument customData = dbCache.getCustom(siteId);
-            revShare = (JsonObject) customData.content().get("revenueShare");
-            granularityMultiplier = Float
-                    .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
-            sectionId = customData.content().get("sectionId").toString();
-            sectionName = customData.content().get("sectionName").toString();
-            activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
+            String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0,"
+                    + "\"max\": 3," + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8,"
+                    + "\"increment\": 0.05" + "}," + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}"
+                    + "]" + "}";
+            JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
+            int pbPrecision = priceGranularityObject.getInt("precision");
+            JsonArray rangesArray = priceGranularityObject.getArray("ranges");
+            String requestId = bidRequest.getId();
+            String siteId = requestId.split(":", 2)[0];
+            String sectionId = "";
+            String sectionName = "";
+            String activeDfpCurrencyCode = "USD";
+            JsonObject revShare = JsonObject.create();
+            double granularityMultiplier = 1;
 
-            logger.info(customData.content().get("ownerEmail").toString());
-            logger.info(customData.content().get("prebidGranularityMultiplier").toString());
-            logger.info(sectionId);
-            logger.info(sectionName);
-            logger.info(revShare); // Another JsonObject
-        } catch (NullPointerException e) {
-            logger.info(e);
-            logger.info("NullPointerException while getting data from cache");
-        }
-
-        if (!newTargeting.isEmpty()) {
-            String uuid = UUID.randomUUID().toString();
-            String winningBidder = newTargeting.remove("hb_bidder").asText();
-            int winningBidderRevShare;
             try {
-                winningBidderRevShare = Integer.parseInt((String) revShare.get(winningBidder));
-            } catch (NumberFormatException e) {
-                winningBidderRevShare = 0;
-            }
-            newTargeting.put("hb_ap_bidder", TextNode.valueOf(winningBidder));
-            newTargeting.put("hb_ap_ran", TextNode.valueOf("1"));
-            newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
-            newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
-            newTargeting.remove("hb_pb");
-            float pow = (float) Math.pow(10, pbPrecision + 2);
-            List<SeatBid> sbids = bidResponse.getSeatbid();
-            for (SeatBid sbid : sbids) {
-                if (sbid.getSeat() == winningBidder) {
-                    float originalCpm = sbid.getBid().get(0).getPrice().floatValue();
-                    float adjustedCpm = originalCpm - (originalCpm * winningBidderRevShare / 100);
-                    float max;
-                    float min;
-                    float increment;
-                    float pb = 0;
-                    JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() - 1);
-                    float largestMax = Float.parseFloat(largestBucket.get("max").toString());
-                    if (adjustedCpm > largestMax) {
-                        max = largestMax;
-                        min = Float.parseFloat(largestBucket.get("min").toString());
-                        increment = Float.parseFloat(largestBucket.get("increment").toString());
-                        float cpmToFloor = ((adjustedCpm * pow) - (min * pow)) / (increment * pow);
-                        pb = min + (increment * Math.round(cpmToFloor));
-                    }
-                    for (Object s : rangesArray) {
-                        max = Float.parseFloat(((JsonObject) s).get("max").toString());
-                        min = Float.parseFloat(((JsonObject) s).get("min").toString());
-                        increment = Float.parseFloat(((JsonObject) s).get("increment").toString());
-                        if (adjustedCpm < max && adjustedCpm >= min) {
-                            float cpmToFloor = ((adjustedCpm * pow) - (min * pow)) / (increment * pow);
-                            pb = min + (increment * Math.round(cpmToFloor));
-                            break;
-                        }
-                    }
+                JsonDocument customData = dbCache.getCustom(siteId);
+                revShare = (JsonObject) customData.content().get("revenueShare");
+                granularityMultiplier = Float
+                        .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
+                sectionId = customData.content().get("sectionId").toString();
+                sectionName = customData.content().get("sectionName").toString();
+                activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
 
-                    DecimalFormat df = new DecimalFormat("0.00");
-                    df.setRoundingMode(RoundingMode.DOWN);
-                    String apPb = df.format(pb * granularityMultiplier);
-                    newTargeting.put("hp_ap_pb", TextNode.valueOf(apPb));
-                    newTargeting.put("hb_ap_cpm", TextNode.valueOf(Float.toString(adjustedCpm)));
-                    newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
+                logger.info(customData.content().get("ownerEmail").toString());
+                logger.info(customData.content().get("prebidGranularityMultiplier").toString());
+                logger.info(sectionId);
+                logger.info(sectionName);
+                logger.info(revShare); // Another JsonObject
+            } catch (NullPointerException e) {
+                logger.info(e);
+                logger.info("NullPointerException while getting data from cache");
+            }
+
+            if (!newTargeting.isEmpty()) {
+                String uuid = UUID.randomUUID().toString();
+                String winningBidder = newTargeting.remove("hb_bidder").asText();
+                double winningBidderRevShare;
+                logger.info(winningBidder);
+                try {
+                    winningBidderRevShare = Double.parseDouble(((String) revShare.get(winningBidder)));
+                } catch (NumberFormatException e) { // TODO Handle the case where bidder key not present in revshare
+                                                    // object
+                    winningBidderRevShare = 0;
+                }
+                newTargeting.put("hb_ap_bidder", TextNode.valueOf(winningBidder));
+                newTargeting.put("hb_ap_ran", TextNode.valueOf("1"));
+                newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
+                newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
+                newTargeting.remove("hb_pb");
+                BigDecimal pow = BigDecimal.valueOf(Math.pow(10, pbPrecision + 2));
+                List<SeatBid> sbids = bidResponse.getSeatbid();
+                for (SeatBid sbid : sbids) {
+                    if (sbid.getSeat() == winningBidder) {
+                        BigDecimal originalCpm = sbid.getBid().get(0).getPrice();
+                        BigDecimal adjustedCpm = originalCpm
+                                .subtract(originalCpm.multiply(BigDecimal.valueOf(winningBidderRevShare / 100)));
+                        BigDecimal max;
+                        BigDecimal min;
+                        BigDecimal increment;
+                        BigDecimal pb = BigDecimal.ZERO;
+                        JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() - 1);
+                        BigDecimal largestMax = new BigDecimal(largestBucket.get("max").toString());
+                        if (adjustedCpm.compareTo(largestMax) > 0) {
+                            pb = largestMax;
+                        } else {
+                            for (Object s : rangesArray) {
+                                max = new BigDecimal(((JsonObject) s).get("max").toString());
+                                min = new BigDecimal(((JsonObject) s).get("min").toString());
+                                increment = new BigDecimal(((JsonObject) s).get("increment").toString());
+                                if (adjustedCpm.compareTo(max) < 0 && adjustedCpm.compareTo(min) >= 0) {
+                                    BigDecimal cpmToFloor = ((adjustedCpm.multiply(pow).subtract(min.multiply(pow)))
+                                            .divide(increment.multiply(pow)));
+                                    pb = cpmToFloor.round(new MathContext(2, RoundingMode.DOWN)).multiply(increment)
+                                            .add(min);
+                                    break;
+                                }
+                            }
+                        }
+
+                        DecimalFormat df = new DecimalFormat("0.00");
+                        df.setRoundingMode(RoundingMode.DOWN);
+                        String apPb = df.format(pb.multiply(BigDecimal.valueOf(granularityMultiplier)));
+                        newTargeting.put("hp_ap_pb", TextNode.valueOf(apPb));
+                        newTargeting.put("hb_ap_cpm", TextNode.valueOf(adjustedCpm.toString()));
+                        newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
+                    }
+                }
+                String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint,
+                        uuid, siteId);
+                newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
+                try {
+                    String json = mapper.encode(newTargeting);
+                    String bidResJson = mapper.encode(bidResponse);
+                    Map<String, String> postBodyMap = new HashMap<String, String>();
+                    postBodyMap.put("uuid", uuid);
+                    postBodyMap.put("sectionId", sectionId);
+                    postBodyMap.put("sectionName", sectionName);
+                    postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
+                    postBodyMap.put("targeting", json);
+                    postBodyMap.put("bidResponse", bidResJson);
+                    String postBody = mapper.encode(postBodyMap);
+                    Future<?> future = httpClient
+                            .post(imdFeedbackHost + imdFeedbackEndpoint, HttpUtil.headers(), postBody, 1000L)
+                            .setHandler(res -> logger.info(res));
+                } catch (EncodeException e) {
+                    logger.info(e);
                 }
             }
-            String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint, uuid,
-                    siteId);
-            newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
-            try {
-                String json = mapper.encode(newTargeting);
-                String bidResJson = mapper.encode(bidResponse);
-                Map<String, String> postBodyMap = new HashMap<String, String>();
-                postBodyMap.put("uuid", uuid);
-                postBodyMap.put("sectionId", sectionId);
-                postBodyMap.put("sectionName", sectionName);
-                postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
-                postBodyMap.put("targeting", json);
-                postBodyMap.put("bidResponse", bidResJson);
-                String postBody = mapper.encode(postBodyMap);
-                Future<?> future = httpClient
-                        .post(imdFeedbackHost + imdFeedbackEndpoint, HttpUtil.headers(), postBody, 1000L)
-                        .setHandler(res -> logger.info(res));
-            } catch (EncodeException e) {
-                logger.info(e);
-            }
+
+        } catch (Exception e) {
+            logger.info("Generic Exception Caught");
+            newTargeting = new HashMap<String, JsonNode>();
+            return Future.succeededFuture(AmpResponse.of(newTargeting, ampResponse.getDebug(), ampResponse.getErrors()));
         }
         return Future.succeededFuture(ampResponse);
     }
