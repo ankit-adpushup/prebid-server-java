@@ -3,11 +3,11 @@ package org.prebid.server.auction;
 import com.adpushup.e3.Database.DbManager;
 import com.adpushup.e3.Database.Cache.DbCacheManager;
 import com.couchbase.client.core.CouchbaseException;
-import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
 import com.couchbase.client.java.query.N1qlQuery;
+import com.couchbase.client.java.query.N1qlQueryResult;
 import com.couchbase.client.java.query.N1qlQueryRow;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.TextNode;
@@ -60,8 +60,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackEndpoint = imdFeedbackEndpoint;
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
-        this.dbCache = new DbCacheManager(51200, 30000, db.getNewAppBucket(), db);
-        ArrayList<JsonDocument> docList = dbCache.queryAndSetCustomData(_bucket -> {
+        this.dbCache = new DbCacheManager(51200, 30000 , db.getNewAppBucket(), db);
+        dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
                     + " WHERE meta().id = 'user::%s';";
@@ -73,12 +73,30 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             try {
                 for (N1qlQueryRow row : _bucket.query(N1qlQuery.simple(query1))) {
                     jsonObj = row.value();
-                    String siteId = jsonObj.get("siteId").toString();
-                    for (N1qlQueryRow i : _bucket
-                            .query(N1qlQuery.simple(String.format(query2, jsonObj.get("ownerEmail").toString())))) {
-                        jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
-                        jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
+                    if(jsonObj == null) {
+                        logger.info("jsonObj is null");
+                        continue;
                     }
+                    String siteId = Objects.toString(jsonObj.get("siteId"), "");
+                    String ownerEmail = Objects.toString(jsonObj.get("ownerEmail"), "");
+                    if(siteId.isEmpty()) {
+                        logger.info("siteId is null or empty");
+                        continue;
+                    }
+                    if(ownerEmail.isEmpty()) {
+                        logger.info("ownerEmail is null or empty");
+                        continue;
+                    }
+                    N1qlQueryResult userDocResult = _bucket.query(N1qlQuery.simple(String.format(query2, ownerEmail)));
+                    List <N1qlQueryRow> rows = userDocResult.allRows();
+                    if(rows.size() == 0) {
+                        logger.info("No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail);
+                        continue;
+                    }
+                    N1qlQueryRow i = rows.get(0);
+                    jsonObj.put("prebidGranularityMultiplier", i.value().get("prebidGranularityMultiplier"));
+                    jsonObj.put("activeDFPCurrencyCode", i.value().get("activeDFPCurrencyCode"));
+    
                     for (N1qlQueryRow j : _bucket.query(N1qlQuery.simple(String.format(query3, siteId)))) {
                         JsonObject hbcf = j.value();
                         JsonObject revShareObj = JsonObject.create();
