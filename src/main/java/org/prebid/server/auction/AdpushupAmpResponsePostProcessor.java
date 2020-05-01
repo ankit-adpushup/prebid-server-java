@@ -115,7 +115,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             } catch (CouchbaseException e) {
                 logger.info(e);
             }
-            logger.info(list);
+            logger.info("got " + list.size() + " items for cache");
             return list;
         });
     }
@@ -138,14 +138,16 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         String activeDfpCurrencyCode = "USD";
         JsonObject revShare = JsonObject.create();
         float granularityMultiplier = 1;
-
+        // logger.info("\n================ bidResponse ===================\n");
+        // logger.info(bidResponse);
+        // logger.info("\n===================================\n");
         try {
             JsonDocument customData = dbCache.getCustom(siteId);
             revShare = (JsonObject) customData.content().get("revenueShare");
             granularityMultiplier = Float
                     .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
-            sectionId = customData.content().get("sectionId").toString();
-            sectionName = customData.content().get("sectionName").toString();
+            sectionId = Objects.toString(customData.content().get("sectionId"), "");
+            sectionName = Objects.toString(customData.content().get("sectionName"), "");
             activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
 
             logger.info(customData.content().get("ownerEmail").toString());
@@ -153,9 +155,11 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             logger.info(sectionId);
             logger.info(sectionName);
             logger.info(revShare); // Another JsonObject
+            logger.info("newTargeting" + newTargeting.toString());
         } catch (NullPointerException e) {
             logger.info(e);
             logger.info("NullPointerException while getting data from cache");
+            e.printStackTrace();
         }
 
         if (!newTargeting.isEmpty()) {
@@ -174,7 +178,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             newTargeting.remove("hb_pb");
             float pow = (float) Math.pow(10, pbPrecision + 2);
             List<SeatBid> sbids = bidResponse.getSeatbid();
+            logger.info("=========== auction response =========");
             for (SeatBid sbid : sbids) {
+                logger.info("bid from " + sbid.getSeat() + ", cpm=" + sbid.getBid().get(0).getPrice().floatValue());
                 if (sbid.getSeat() == winningBidder) {
                     float originalCpm = sbid.getBid().get(0).getPrice().floatValue();
                     float adjustedCpm = originalCpm - (originalCpm * winningBidderRevShare / 100);
@@ -210,6 +216,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                 }
             }
+            logger.info("=========================================");
             String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint, uuid,
                     siteId);
             newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
