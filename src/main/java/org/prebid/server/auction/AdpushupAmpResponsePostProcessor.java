@@ -117,7 +117,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             } catch (CouchbaseException e) {
                 logger.info(e);
             }
-            logger.info(list);
+            logger.info("got " + list.size() + " items for cache");
             return list;
         });
     }
@@ -157,9 +157,11 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 logger.info(sectionId);
                 logger.info(sectionName);
                 logger.info(revShare); // Another JsonObject
+                logger.info("newTargeting" + newTargeting.toString());
             } catch (NullPointerException e) {
                 logger.info(e);
                 logger.info("NullPointerException while getting data from cache or while parsing the data");
+                e.printStackTrace();
             }
 
             if (!newTargeting.isEmpty()) {
@@ -180,7 +182,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 newTargeting.remove("hb_pb");
                 BigDecimal pow = BigDecimal.valueOf(Math.pow(10, pbPrecision + 2));
                 List<SeatBid> sbids = bidResponse.getSeatbid();
+                logger.info("=========== auction response =========");
                 for (SeatBid sbid : sbids) {
+                    logger.info("bid from " + sbid.getSeat() + ", cpm=" + sbid.getBid().get(0).getPrice().floatValue());
                     if (sbid.getSeat() == winningBidder) {
                         BigDecimal originalCpm = sbid.getBid().get(0).getPrice();
                         BigDecimal adjustedCpm = originalCpm
@@ -216,6 +220,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                     }
                 }
+                logger.info("======================================");
                 String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint,
                         uuid, siteId);
                 newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
