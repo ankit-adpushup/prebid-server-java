@@ -171,9 +171,10 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 logger.info(winningBidder);
                 try {
                     winningBidderRevShare = Double.parseDouble(((String) revShare.get(winningBidder)));
-                } catch (NumberFormatException e) { // TODO Handle the case where bidder key not present in revshare
+                } catch (NumberFormatException | NullPointerException e) { // TODO Handle the case where bidder key not present in revshare
                                                     // object
                     winningBidderRevShare = 0;
+                    logger.info(e);
                 }
                 newTargeting.put("hb_ap_bidder", TextNode.valueOf(winningBidder));
                 newTargeting.put("hb_ap_ran", TextNode.valueOf("1"));
@@ -245,6 +246,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
         } catch (Exception e) {
             logger.info("Generic Exception Caught");
+            logger.info(e);
             newTargeting = new HashMap<String, JsonNode>();
             return Future.succeededFuture(AmpResponse.of(newTargeting, ampResponse.getDebug(), ampResponse.getErrors()));
         }
