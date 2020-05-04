@@ -66,7 +66,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
                     + " WHERE meta().id = 'user::%s';";
             String query3 = "SELECT RAW hbcf from `AppBucket` WHERE meta().id = 'hbdc::%s';";
-            String query4 = "SELECT id, name FROM `AppBucket` WHERE meta().id like 'amtg::%%' AND siteId = %s";
+            String query4 = "SELECT id, name FROM `AppBucket` WHERE meta().id like 'amtg::%s:%%'";
             JsonObject jsonObj;
             JsonDocument jsonDoc;
             ArrayList<JsonDocument> list = new ArrayList<JsonDocument>();
