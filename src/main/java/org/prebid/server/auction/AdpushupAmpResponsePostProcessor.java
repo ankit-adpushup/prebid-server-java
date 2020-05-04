@@ -108,7 +108,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     }
                     JsonObject adUnits = JsonObject.create();
                     for (N1qlQueryRow k : _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
-                        adUnits.put(k.value().get("id").toString(), k.value().get("name"));
+                        adUnits.put(k.value().get("id").toString().split(":", 2)[1], k.value().get("name"));
                     }
                     jsonObj.put("adUnits", adUnits);
                     jsonDoc = JsonDocument.create(siteId, jsonObj);
@@ -118,6 +118,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 logger.info(e);
             }
             logger.info("got " + list.size() + " items for cache");
+            logger.info(list);
             return list;
         });
     }
