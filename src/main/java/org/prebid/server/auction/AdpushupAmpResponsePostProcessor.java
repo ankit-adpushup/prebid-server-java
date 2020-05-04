@@ -216,7 +216,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         DecimalFormat df = new DecimalFormat("0.00");
                         df.setRoundingMode(RoundingMode.DOWN);
                         String apPb = df.format(pb.multiply(BigDecimal.valueOf(granularityMultiplier)));
-                        newTargeting.put("hp_ap_pb", TextNode.valueOf(apPb));
+                        newTargeting.put("hp_ap_pb_amp", TextNode.valueOf(apPb));
                         newTargeting.put("hb_ap_cpm", TextNode.valueOf(adjustedCpm.toString()));
                         newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                     }
