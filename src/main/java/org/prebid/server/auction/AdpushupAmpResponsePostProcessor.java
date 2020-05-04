@@ -118,7 +118,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 logger.info(e);
             }
             logger.info("got " + list.size() + " items for cache");
-            logger.info(list);
             return list;
         });
     }
