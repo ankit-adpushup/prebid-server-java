@@ -170,7 +170,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 double winningBidderRevShare;
                 logger.info(winningBidder);
                 try {
-                    winningBidderRevShare = Double.parseDouble(((String) revShare.get(winningBidder)));
+                    winningBidderRevShare = Double.valueOf((int) revShare.get(winningBidder));
                 } catch (NumberFormatException | NullPointerException e) { // TODO Handle the case where bidder key not present in revshare
                                                     // object
                     winningBidderRevShare = 0;
@@ -216,15 +216,16 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         DecimalFormat df = new DecimalFormat("0.00");
                         df.setRoundingMode(RoundingMode.DOWN);
                         String apPb = df.format(pb.multiply(BigDecimal.valueOf(granularityMultiplier)));
-                        newTargeting.put("hp_ap_pb_amp", TextNode.valueOf(apPb));
+                        newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
                         newTargeting.put("hb_ap_cpm", TextNode.valueOf(adjustedCpm.toString()));
                         newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                     }
                 }
                 logger.info("======================================");
-                String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint,
-                        uuid, siteId);
-                newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
+                // String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint,
+                //         uuid, siteId);
+                // newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
+                newTargeting.put("hb_ap_auction_id", TextNode.valueOf(uuid));
                 try {
                     String json = mapper.encode(newTargeting);
                     String bidResJson = mapper.encode(bidResponse);
@@ -247,6 +248,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         } catch (Exception e) {
             logger.info("Generic Exception Caught");
             logger.info(e);
+            e.printStackTrace();
             newTargeting = new HashMap<String, JsonNode>();
             return Future.succeededFuture(AmpResponse.of(newTargeting, ampResponse.getDebug(), ampResponse.getErrors()));
         }
