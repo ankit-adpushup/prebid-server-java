@@ -143,6 +143,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String activeDfpCurrencyCode = "USD";
             JsonObject revShare = JsonObject.create();
             double granularityMultiplier = 1;
+            Map<String, String> postBodyMap = new HashMap<String, String>();
 
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);
@@ -170,7 +171,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 double winningBidderRevShare;
                 logger.info(winningBidder);
                 try {
-                    winningBidderRevShare = Double.valueOf((int) revShare.get(winningBidder));
+                    winningBidderRevShare = Double.valueOf(revShare.get(winningBidder));
                 } catch (NumberFormatException | NullPointerException e) { // TODO Handle the case where bidder key not present in revshare
                                                     // object
                     winningBidderRevShare = 0;
@@ -196,6 +197,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         BigDecimal pb = BigDecimal.ZERO;
                         JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() - 1);
                         BigDecimal largestMax = new BigDecimal(largestBucket.get("max").toString());
+                        postBodyMap.put("originalCpm", originalCpm.toString());
                         if (adjustedCpm.compareTo(largestMax) > 0) {
                             pb = largestMax;
                         } else {
@@ -217,7 +219,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         df.setRoundingMode(RoundingMode.DOWN);
                         String apPb = df.format(pb.multiply(BigDecimal.valueOf(granularityMultiplier)));
                         newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
-                        newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
+                        // newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
                         newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                     }
                 }
@@ -229,7 +231,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 try {
                     String json = mapper.encode(newTargeting);
                     String bidResJson = mapper.encode(bidResponse);
-                    Map<String, String> postBodyMap = new HashMap<String, String>();
                     postBodyMap.put("uuid", uuid);
                     postBodyMap.put("sectionId", sectionId);
                     postBodyMap.put("sectionName", sectionName);
