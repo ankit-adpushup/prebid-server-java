@@ -108,7 +108,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     }
                     JsonObject adUnits = JsonObject.create();
                     for (N1qlQueryRow k : _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
-                        adUnits.put(k.value().get("id").toString().split(":", 2)[1], k.value().get("name"));
+                        adUnits.put(k.value().get("id").toString(), k.value().get("name"));
                     }
                     jsonObj.put("adUnits", adUnits);
                     jsonDoc = JsonDocument.create(siteId, jsonObj);
@@ -217,7 +217,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         df.setRoundingMode(RoundingMode.DOWN);
                         String apPb = df.format(pb.multiply(BigDecimal.valueOf(granularityMultiplier)));
                         newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
-                        newTargeting.put("hb_ap_cpm", TextNode.valueOf(adjustedCpm.toString()));
+                        newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
                         newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                     }
                 }
