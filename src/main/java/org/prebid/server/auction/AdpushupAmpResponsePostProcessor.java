@@ -205,30 +205,27 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         BigDecimal increment;
                         BigDecimal pb = BigDecimal.ZERO;
                         JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() - 1);
-                        BigDecimal largestMax = new BigDecimal(largestBucket.get("max").toString());
+                        BigDecimal largestMax = new BigDecimal(largestBucket.get("max").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
                         postBodyMap.put("originalCpm", originalCpm.toString());
                         if (adjustedCpm.compareTo(largestMax) > 0) {
                             pb = largestMax;
                         } else {
                             for (Object s : rangesArray) {
-                                max = new BigDecimal(((JsonObject) s).get("max").toString());
-                                min = new BigDecimal(((JsonObject) s).get("min").toString());
-                                increment = new BigDecimal(((JsonObject) s).get("increment").toString());
+                                max = new BigDecimal(((JsonObject) s).get("max").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
+                                min = new BigDecimal(((JsonObject) s).get("min").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
+                                increment = new BigDecimal(((JsonObject) s).get("increment").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
                                 if (adjustedCpm.compareTo(max) < 0 && adjustedCpm.compareTo(min) >= 0) {
-                                    BigDecimal cpmToFloor = ((adjustedCpm.multiply(pow).subtract(min.multiply(pow)))
-                                            .divide(increment.multiply(pow)));
-                                    pb = cpmToFloor.round(new MathContext(2, RoundingMode.DOWN)).multiply(increment)
-                                            .add(min);
+                                    int cpmToFloor = ((adjustedCpm.multiply(pow).subtract(min.multiply(pow)))
+                                            .divide(increment.multiply(pow), RoundingMode.DOWN)).intValue();
+                                    pb = increment.multiply(BigDecimal.valueOf(cpmToFloor)).add(min);
                                     break;
                                 }
                             }
                         }
 
                         DecimalFormat df = new DecimalFormat("0.00");
-                        df.setRoundingMode(RoundingMode.DOWN);
-                        String apPb = df.format(pb.multiply(BigDecimal.valueOf(granularityMultiplier)));
+                        String apPb = df.format(pb);
                         newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
-                        // newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
                         newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
                     }
                 }
