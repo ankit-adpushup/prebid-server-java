@@ -89,7 +89,7 @@ public class DbCacheManager {
 
     public void set(String id, JsonDocument jsonDoc, Callback func) {
         CachedDocument cachedDoc = new CachedDocument(id, jsonDoc, DEFAULT_DOC_TTL, true, func);
-        _cache.putIfAbsent(id, cachedDoc);
+        _cache.put(id, cachedDoc);
     }
 
     public ArrayList<JsonDocument> queryAndSetCustomData(Callback func) {

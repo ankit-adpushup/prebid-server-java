@@ -107,8 +107,13 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         jsonObj.put("revenueShare", revShareObj);
                     }
                     JsonObject adUnits = JsonObject.create();
+                    Integer adUnitsFound = 0;
                     for (N1qlQueryRow k : _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
+                        adUnitsFound++;
                         adUnits.put(k.value().get("id").toString(), k.value().get("name"));
+                    }
+                    if(adUnitsFound > 0) {
+                        logger.info(" siteId: " + siteId + " adUnits: " +  adUnits);
                     }
                     jsonObj.put("adUnits", adUnits);
                     jsonDoc = JsonDocument.create(siteId, jsonObj);
@@ -138,7 +143,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String requestId = bidRequest.getId();
             String[] requestIdSplit = requestId.split(":", 2);
             String siteId = requestIdSplit[0];
-            String sectionId = requestIdSplit[1];
+            String sectionId = requestId;
             String sectionName = "";
             String activeDfpCurrencyCode = "USD";
             JsonObject revShare = JsonObject.create();
@@ -147,11 +152,13 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);
+                logger.info("customData.content()::" + customData.content());
+                logger.info(">>>>>>>>>sectionId " + sectionId);
                 revShare = (JsonObject) customData.content().get("revenueShare");
                 granularityMultiplier = Float
                         .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
-                sectionName = ((JsonObject) customData.content().get("adUnits")).get(sectionId).toString();
                 activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
+                sectionName = ((JsonObject) customData.content().get("adUnits")).get(sectionId).toString();
 
                 logger.info(customData.content().get("ownerEmail").toString());
                 logger.info(customData.content().get("prebidGranularityMultiplier").toString());
@@ -163,6 +170,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 logger.info(e);
                 logger.info("NullPointerException while getting data from cache or while parsing the data");
                 e.printStackTrace();
+                // throw exception to stop further processing
+                throw new NullPointerException(e.getMessage());
             }
 
             if (!newTargeting.isEmpty()) {
@@ -171,9 +180,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 double winningBidderRevShare;
                 logger.info(winningBidder);
                 try {
-                    winningBidderRevShare = Double.valueOf(revShare.get(winningBidder));
-                } catch (NumberFormatException | NullPointerException e) { // TODO Handle the case where bidder key not present in revshare
-                                                    // object
+                    winningBidderRevShare = Double.valueOf(revShare.get(winningBidder).toString());
+                } catch (NumberFormatException | NullPointerException e) {
+                    // TODO Handle the case where bidder key not present in revshare
                     winningBidderRevShare = 0;
                     logger.info(e);
                 }
