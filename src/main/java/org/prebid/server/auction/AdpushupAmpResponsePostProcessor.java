@@ -62,7 +62,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.db = new DbManager(ips, cbUsername, cbPassword);
         this.dbCache = new DbCacheManager(51200, 30000 , db.getNewAppBucket(), db);
         dbCache.queryAndSetCustomData(_bucket -> {
-            String query1 = "SELECT ownerEmail, siteId from `AppBucket` WHERE meta().id like 'site::%';";
+            String query1 = "SELECT ownerEmail, siteId, siteDomain from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
                     + " WHERE meta().id = 'user::%s';";
             String query3 = "SELECT RAW hbcf from `AppBucket` WHERE meta().id = 'hbdc::%s';";
@@ -79,12 +79,17 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     }
                     String siteId = Objects.toString(jsonObj.get("siteId"), "");
                     String ownerEmail = Objects.toString(jsonObj.get("ownerEmail"), "");
+                    String siteDomain = Objects.toString(jsonObj.get("siteDomain"), "");
                     if(siteId.isEmpty()) {
                         logger.info("siteId is null or empty");
                         continue;
                     }
                     if(ownerEmail.isEmpty()) {
                         logger.info("ownerEmail is null or empty");
+                        continue;
+                    }
+                    if(siteDomain.isEmpty()) {
+                        logger.info("siteDomain is null or empty");
                         continue;
                     }
                     N1qlQueryResult userDocResult = _bucket.query(N1qlQuery.simple(String.format(query2, ownerEmail)));
@@ -146,6 +151,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String sectionId = requestId;
             String sectionName = "";
             String activeDfpCurrencyCode = "USD";
+            String siteDomain = "";
             JsonObject revShare = JsonObject.create();
             double granularityMultiplier = 1;
             Map<String, String> postBodyMap = new HashMap<String, String>();
@@ -159,7 +165,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
                 activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
                 sectionName = ((JsonObject) customData.content().get("adUnits")).get(sectionId).toString();
-
+                siteDomain = customData.content().get("siteDomain").toString();
+                logger.info("siteDomain=" + siteDomain);
                 logger.info(customData.content().get("ownerEmail").toString());
                 logger.info(customData.content().get("prebidGranularityMultiplier").toString());
                 logger.info(sectionId);
@@ -226,17 +233,24 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         DecimalFormat df = new DecimalFormat("0.00");
                         String apPb = df.format(pb);
                         newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
-                        newTargeting.put("hb_ap_adid", TextNode.valueOf(sbid.getBid().get(0).getAdid()));
+                        // newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
+                        
+                        // AdId is not needed in amp ads, and bidders are not sending it either
+                        // So, we will just send the bid.id
+                        String AdId = sbid.getBid().get(0).getId();
+                        logger.info("hb_ap_adid=" + AdId);
+                        newTargeting.put("hb_ap_adid", TextNode.valueOf(AdId));
                     }
                 }
                 logger.info("======================================");
-                // String apFeedbackUrl = String.format("%s?id=%s&sid=%s", imdFeedbackHost + imdFeedbackCreativeEndpoint,
-                //         uuid, siteId);
-                // newTargeting.put("hb_ap_feedback_url", TextNode.valueOf(apFeedbackUrl));
                 newTargeting.put("hb_ap_auction_id", TextNode.valueOf(uuid));
                 try {
                     String json = mapper.encode(newTargeting);
                     String bidResJson = mapper.encode(bidResponse);
+                    String pageUrl = bidRequest.getSite().getPage();
+                    postBodyMap.put("siteId", siteId);
+                    postBodyMap.put("siteDomain", siteDomain);
+                    postBodyMap.put("pageUrl", pageUrl);
                     postBodyMap.put("uuid", uuid);
                     postBodyMap.put("sectionId", sectionId);
                     postBodyMap.put("sectionName", sectionName);
