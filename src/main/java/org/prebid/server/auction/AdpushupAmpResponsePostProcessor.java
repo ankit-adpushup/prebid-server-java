@@ -196,7 +196,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 newTargeting.put("hb_ap_bidder", TextNode.valueOf(winningBidder));
                 newTargeting.put("hb_ap_ran", TextNode.valueOf("1"));
                 newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
-                newTargeting.put("hb_ap_format", TextNode.valueOf("banner"));
+                newTargeting.put("hb_ap_format_amp", TextNode.valueOf("banner"));
                 newTargeting.remove("hb_pb");
                 BigDecimal pow = BigDecimal.valueOf(Math.pow(10, pbPrecision + 2));
                 List<SeatBid> sbids = bidResponse.getSeatbid();
