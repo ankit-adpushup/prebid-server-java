@@ -233,7 +233,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         DecimalFormat df = new DecimalFormat("0.00");
                         String apPb = df.format(pb);
                         newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
-                        // newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
+                        newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
                         
                         // AdId is not needed in amp ads, and bidders are not sending it either
                         // So, we will just send the bid.id
