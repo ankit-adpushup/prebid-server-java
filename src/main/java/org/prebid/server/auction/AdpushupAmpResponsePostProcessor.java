@@ -198,13 +198,14 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 newTargeting.put("hb_ap_siteid", TextNode.valueOf(siteId));
                 newTargeting.put("hb_ap_format_amp", TextNode.valueOf("banner"));
                 newTargeting.remove("hb_pb");
+                BigDecimal originalCpm = new BigDecimal(0.0);
                 BigDecimal pow = BigDecimal.valueOf(Math.pow(10, pbPrecision + 2));
                 List<SeatBid> sbids = bidResponse.getSeatbid();
                 logger.info("=========== auction response =========");
                 for (SeatBid sbid : sbids) {
                     logger.info("bid from " + sbid.getSeat() + ", cpm=" + sbid.getBid().get(0).getPrice().floatValue());
                     if (sbid.getSeat() == winningBidder) {
-                        BigDecimal originalCpm = sbid.getBid().get(0).getPrice();
+                        originalCpm = sbid.getBid().get(0).getPrice();
                         BigDecimal adjustedCpm = originalCpm
                                 .subtract(originalCpm.multiply(BigDecimal.valueOf(winningBidderRevShare / 100)));
                         BigDecimal max;
@@ -213,7 +214,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         BigDecimal pb = BigDecimal.ZERO;
                         JsonObject largestBucket = (JsonObject) rangesArray.get(rangesArray.size() - 1);
                         BigDecimal largestMax = new BigDecimal(largestBucket.get("max").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
-                        postBodyMap.put("originalCpm", originalCpm.toString());
                         if (adjustedCpm.compareTo(largestMax) > 0) {
                             pb = largestMax;
                         } else {
@@ -233,8 +233,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         DecimalFormat df = new DecimalFormat("0.00");
                         String apPb = df.format(pb);
                         newTargeting.put("hb_ap_pb_amp", TextNode.valueOf(apPb));
-                        newTargeting.put("hb_ap_cpm", TextNode.valueOf(originalCpm.toString()));
-                        
+
                         // AdId is not needed in amp ads, and bidders are not sending it either
                         // So, we will just send the bid.id
                         String AdId = sbid.getBid().get(0).getId();
@@ -257,6 +256,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
                     postBodyMap.put("targeting", json);
                     postBodyMap.put("bidResponse", bidResJson);
+                    postBodyMap.put("originalCpm", originalCpm.toString());
                     String postBody = mapper.encode(postBodyMap);
                     Future<?> future = httpClient
                             .post(imdFeedbackHost + imdFeedbackEndpoint, HttpUtil.headers(), postBody, 1000L)
