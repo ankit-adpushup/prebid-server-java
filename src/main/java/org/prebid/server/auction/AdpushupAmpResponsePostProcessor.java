@@ -107,7 +107,10 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                         JsonObject revShareObj = JsonObject.create();
                         Set<String> bidderNames = hbcf.getNames();
                         for (String bidder : bidderNames) {
-                            revShareObj.put(bidder, ((JsonObject) hbcf.get(bidder)).get("revenueShare"));
+                            JsonObject bidderObj = JsonObject.create();
+                            bidderObj.put("bids", ((JsonObject) hbcf.get(bidder)).get("bids"));
+                            bidderObj.put("revenueShare", ((JsonObject) hbcf.get(bidder)).get("revenueShare"));
+                            revShareObj.put(bidder, bidderObj);
                         }
                         jsonObj.put("revenueShare", revShareObj);
                     }
@@ -185,9 +188,15 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 String uuid = UUID.randomUUID().toString();
                 String winningBidder = newTargeting.remove("hb_bidder").asText();
                 double winningBidderRevShare;
+                boolean isGross = false;
+                String bidType = ((JsonObject) revShare.get(winningBidder)).get("bids").toString();
+                if (bidType.equals("gross")) {
+                    isGross = true;
+                }
                 logger.info(winningBidder);
                 try {
-                    winningBidderRevShare = Double.valueOf(revShare.get(winningBidder).toString());
+                    // winningBidderRevShare = Double.valueOf(revShare.get(winningBidder).toString());
+                    winningBidderRevShare = Double.valueOf(((JsonObject) revShare.get(winningBidder)).get("revenueShare").toString());
                 } catch (NumberFormatException | NullPointerException e) {
                     // TODO Handle the case where bidder key not present in revshare
                     winningBidderRevShare = 0;
@@ -206,8 +215,11 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     logger.info("bid from " + sbid.getSeat() + ", cpm=" + sbid.getBid().get(0).getPrice().floatValue());
                     if (sbid.getSeat() == winningBidder) {
                         originalCpm = sbid.getBid().get(0).getPrice();
-                        BigDecimal adjustedCpm = originalCpm
+                        BigDecimal adjustedCpm = originalCpm;
+                        if(isGross) {
+                            adjustedCpm = originalCpm
                                 .subtract(originalCpm.multiply(BigDecimal.valueOf(winningBidderRevShare / 100)));
+                        }
                         BigDecimal max;
                         BigDecimal min;
                         BigDecimal increment;
@@ -257,6 +269,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("targeting", json);
                     postBodyMap.put("bidResponse", bidResJson);
                     postBodyMap.put("originalCpm", originalCpm.toString());
+                    postBodyMap.put("bidType", bidType);
                     String postBody = mapper.encode(postBodyMap);
                     Future<?> future = httpClient
                             .post(imdFeedbackHost + imdFeedbackEndpoint, HttpUtil.headers(), postBody, 1000L)
