@@ -208,6 +208,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 newTargeting.put("hb_ap_format_amp", TextNode.valueOf("banner"));
                 newTargeting.remove("hb_pb");
                 BigDecimal originalCpm = new BigDecimal(0.0);
+                BigDecimal adjustedCpm = originalCpm;
                 BigDecimal pow = BigDecimal.valueOf(Math.pow(10, pbPrecision + 2));
                 List<SeatBid> sbids = bidResponse.getSeatbid();
                 logger.info("=========== auction response =========");
@@ -215,7 +216,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     logger.info("bid from " + sbid.getSeat() + ", cpm=" + sbid.getBid().get(0).getPrice().floatValue());
                     if (sbid.getSeat() == winningBidder) {
                         originalCpm = sbid.getBid().get(0).getPrice();
-                        BigDecimal adjustedCpm = originalCpm;
+                        adjustedCpm = originalCpm;
                         if(isGross) {
                             adjustedCpm = originalCpm
                                 .subtract(originalCpm.multiply(BigDecimal.valueOf(winningBidderRevShare / 100)));
@@ -268,8 +269,12 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
                     postBodyMap.put("targeting", json);
                     postBodyMap.put("bidResponse", bidResJson);
-                    postBodyMap.put("originalCpm", originalCpm.toString());
-                    postBodyMap.put("bidType", bidType);
+                    if (isGross) {
+                        postBodyMap.put("adjustedCpm", adjustedCpm.toString());
+                    }
+                    else {
+                        postBodyMap.put("originalCpm", originalCpm.toString());
+                    }
                     String postBody = mapper.encode(postBodyMap);
                     Future<?> future = httpClient
                             .post(imdFeedbackHost + imdFeedbackEndpoint, HttpUtil.headers(), postBody, 1000L)
