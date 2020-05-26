@@ -148,16 +148,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
             int pbPrecision = priceGranularityObject.getInt("precision");
             JsonArray rangesArray = priceGranularityObject.getArray("ranges");
-            logger.info("----------------------------------------------------------");
-            try {
-                logger.info("user ua=" + bidRequest.getDevice().getUa());
-                logger.info("user ip=" + bidRequest.getDevice().getIp());
-            } catch(Exception e) {
-                logger.info("Exception logging bidRequest");
-                logger.info(e);
-                e.printStackTrace();
-            }
-            logger.info("----------------------------------------------------------");
             String requestId = bidRequest.getId();
             String[] requestIdSplit = requestId.split(":", 2);
             String siteId = requestIdSplit[0];
@@ -270,6 +260,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     String json = mapper.encode(newTargeting);
                     String bidResJson = mapper.encode(bidResponse);
                     String pageUrl = bidRequest.getSite().getPage();
+                    String deviceUA = bidRequest.getDevice().getUa();
+                    String deviceIp = bidRequest.getDevice().getIp();
                     postBodyMap.put("siteId", siteId);
                     postBodyMap.put("siteDomain", siteDomain);
                     postBodyMap.put("pageUrl", pageUrl);
@@ -279,6 +271,20 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
                     postBodyMap.put("targeting", json);
                     postBodyMap.put("bidResponse", bidResJson);
+                    logger.info("--------------------------- user info -------------------------------");
+                    try {
+                        logger.info("user ua=" + deviceUA);
+                        logger.info("user ip=" + deviceIp);
+                    } catch(Exception e) {
+                        logger.info("Exception logging bidRequest");
+                        logger.info(e);
+                        e.printStackTrace();
+                    }
+                    logger.info("----------------------------------------------------------");
+
+                    postBodyMap.put("deviceIp", deviceIp);
+                    postBodyMap.put("deviceUA", deviceUA);
+
                     if (isGross) {
                         postBodyMap.put("adjustedCpm", adjustedCpm.toString());
                     }
