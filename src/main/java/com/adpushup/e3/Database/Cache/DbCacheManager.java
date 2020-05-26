@@ -146,7 +146,6 @@ public class DbCacheManager {
                     for (int i = 0; i < fetchedData.size(); i++) {
                         JsonDocument doc = fetchedData.get(i);
                         if (doc.id().equals(cachedItem.getId())) {
-                            logger.info("Updating Doc: "+ doc.id());
                             cachedItem.updateJsonDocument(doc, DEFAULT_DOC_TTL);
                             fetchedData.remove(i);
                             break;
