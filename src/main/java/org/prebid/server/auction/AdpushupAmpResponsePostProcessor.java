@@ -60,7 +60,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackEndpoint = imdFeedbackEndpoint;
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
-        this.dbCache = new DbCacheManager(51200, 30000 , db.getNewAppBucket(), db);
+        this.dbCache = new DbCacheManager(51200, 300000 , db.getNewAppBucket(), db);
         dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId, siteDomain from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
@@ -145,6 +145,16 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
             int pbPrecision = priceGranularityObject.getInt("precision");
             JsonArray rangesArray = priceGranularityObject.getArray("ranges");
+            logger.info("----------------------------------------------------------");
+            try {
+                logger.info("user ua=" + bidRequest.getDevice().getUa());
+                logger.info("user ip=" + bidRequest.getDevice().getIp());
+            } catch(Exception e) {
+                logger.info("Exception logging bidRequest");
+                logger.info(e);
+                e.printStackTrace();
+            }
+            logger.info("----------------------------------------------------------");
             String requestId = bidRequest.getId();
             String[] requestIdSplit = requestId.split(":", 2);
             String siteId = requestIdSplit[0];
