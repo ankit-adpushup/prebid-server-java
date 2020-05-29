@@ -286,10 +286,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("deviceUA", deviceUA);
 
                     if (isGross) {
-                        postBodyMap.put("adjustedCpm", adjustedCpm.toString());
-                    }
-                    else {
-                        postBodyMap.put("originalCpm", originalCpm.toString());
+                        postBodyMap.put("winningCpm", adjustedCpm.toString());
+                    } else {
+                        postBodyMap.put("winningCpm", originalCpm.toString());
                     }
                     String postBody = mapper.encode(postBodyMap);
                     Future<?> future = httpClient
