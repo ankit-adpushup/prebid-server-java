@@ -24,9 +24,10 @@ import io.vertx.core.Vertx;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -48,6 +49,53 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private String imdFeedbackCreativeEndpoint;
     private DbManager db;
     private DbCacheManager dbCache;
+    private ExecutorService executor;
+    private final String LogSource = "PrebidServer.AmpPostProcessor";
+    private enum LogLevel {
+        INFO(1),
+        WARNING(2),
+        ERROR(3),
+        ERR(3),
+        UNKNOWN(4),
+        EXCEPTION(5);
+        private final int level;
+        LogLevel(final int level) {
+            this.level = level;
+        }
+        public int getValue() {
+            return level;
+        }
+    };
+    private final String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0,"
+    + "\"max\": 3," + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8,"
+    + "\"increment\": 0.05" + "}," + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}"
+    + "]" + "}";
+    private final JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
+
+    private void sendSystemLogEvent(LogLevel logLevel, String message, String detailedMessage, String jsonDebugData) {
+        Runnable runnableTask = () -> {
+            try {
+                String logSource = LogSource + "." + logLevel;
+                DbManager.insertSystemLog(db, logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData);
+            } catch(Exception e) {
+                logger.error("Exception in send log task");
+                e.printStackTrace();
+            }
+        };
+        this.executor.execute(runnableTask);
+    }
+
+    private void sendSystemLogEvent(Exception ex) {
+        Runnable runnableTask = () -> {
+            try {
+                DbManager.insertSystemLog(db, LogSource+".ERROR", ex);
+            } catch(Exception e) {
+                logger.error("Exception in send log task");
+                e.printStackTrace();
+            }
+        };
+        this.executor.execute(runnableTask);
+    }
 
     public AdpushupAmpResponsePostProcessor(String imdFeedbackHost, String imdFeedbackEndpoint,
             String imdFeedbackCreativeEndpoint, String[] ips, String cbUsername, String cbPassword,
@@ -61,6 +109,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
         this.dbCache = new DbCacheManager(51200, 300000 , db.getNewAppBucket(), db);
+        this.executor = Executors.newFixedThreadPool(100);
+
         dbCache.queryAndSetCustomData(_bucket -> {
             String query1 = "SELECT ownerEmail, siteId, siteDomain from `AppBucket` WHERE meta().id like 'site::%';";
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
@@ -95,7 +145,9 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     N1qlQueryResult userDocResult = _bucket.query(N1qlQuery.simple(String.format(query2, ownerEmail)));
                     List <N1qlQueryRow> rows = userDocResult.allRows();
                     if(rows.size() == 0) {
-                        logger.info("No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail);
+                        String message = "No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail;
+                        logger.info(message);
+                        sendSystemLogEvent(LogLevel.ERROR, "UserDoc not found", message, "");
                         continue;
                     }
                     N1qlQueryRow i = rows.get(0);
@@ -129,6 +181,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 }
             } catch (CouchbaseException e) {
                 logger.info(e);
+                sendSystemLogEvent(e);
             }
             logger.info("got " + list.size() + " items for cache");
             return list;
@@ -141,11 +194,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
         try {
-            String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0,"
-                    + "\"max\": 3," + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8,"
-                    + "\"increment\": 0.05" + "}," + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}"
-                    + "]" + "}";
-            JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
+            String bidResJson = mapper.encode(bidResponse);
             int pbPrecision = priceGranularityObject.getInt("precision");
             JsonArray rangesArray = priceGranularityObject.getArray("ranges");
             String requestId = bidRequest.getId();
@@ -158,6 +207,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             JsonObject revShare = JsonObject.create();
             double granularityMultiplier = 1;
             Map<String, String> postBodyMap = new HashMap<String, String>();
+            
+            sendSystemLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson);
 
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);
@@ -180,6 +231,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 logger.info(e);
                 logger.info("NullPointerException while getting data from cache or while parsing the data");
                 e.printStackTrace();
+                sendSystemLogEvent(e);
                 // throw exception to stop further processing
                 throw new NullPointerException(e.getMessage());
             }
@@ -258,7 +310,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 newTargeting.put("hb_ap_auction_id", TextNode.valueOf(uuid));
                 try {
                     String json = mapper.encode(newTargeting);
-                    String bidResJson = mapper.encode(bidResponse);
                     String pageUrl = bidRequest.getSite().getPage();
                     String deviceUA = bidRequest.getDevice().getUa();
                     String deviceIp = bidRequest.getDevice().getIp();
@@ -271,17 +322,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
                     postBodyMap.put("targeting", json);
                     postBodyMap.put("bidResponse", bidResJson);
-                    logger.info("--------------------------- user info -------------------------------");
-                    try {
-                        logger.info("user ua=" + deviceUA);
-                        logger.info("user ip=" + deviceIp);
-                    } catch(Exception e) {
-                        logger.info("Exception logging bidRequest");
-                        logger.info(e);
-                        e.printStackTrace();
-                    }
-                    logger.info("----------------------------------------------------------");
-
                     postBodyMap.put("deviceIp", deviceIp);
                     postBodyMap.put("deviceUA", deviceUA);
 
@@ -294,6 +334,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     Future<?> future = httpClient
                             .post(imdFeedbackHost + imdFeedbackEndpoint, HttpUtil.headers(), postBody, 1000L)
                             .setHandler(res -> logger.info(res));
+                    sendSystemLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson);
                 } catch (EncodeException e) {
                     logger.info(e);
                 }
