@@ -116,7 +116,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String query2 = "SELECT adServerSettings.dfp.prebidGranularityMultiplier, adServerSettings.dfp.activeDFPCurrencyCode FROM `AppBucket`"
                     + " WHERE meta().id = 'user::%s';";
             String query3 = "SELECT RAW hbcf from `AppBucket` WHERE meta().id = 'hbdc::%s';";
-            String query4 = "SELECT id, name FROM `AppBucket` WHERE meta().id like 'amtg::%s:%%'";
+            String query4 = "SELECT id, name, ad.networkData.dfpAdunit as networkAdUnitId FROM `AppBucket` WHERE meta().id like 'amtg::%s:%%'";
             JsonObject jsonObj;
             JsonDocument jsonDoc;
             ArrayList<JsonDocument> list = new ArrayList<JsonDocument>();
@@ -170,7 +170,10 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     Integer adUnitsFound = 0;
                     for (N1qlQueryRow k : _bucket.query(N1qlQuery.simple(String.format(query4, siteId)))) {
                         adUnitsFound++;
-                        adUnits.put(k.value().get("id").toString(), k.value().get("name"));
+                        JsonObject adUnitDetails = JsonObject.create();
+                        adUnitDetails.put("sectionName", k.value().get("name"));
+                        adUnitDetails.put("networkAdUnitId", k.value().get("networkAdUnitId"));
+                        adUnits.put(k.value().get("id").toString(), adUnitDetails);
                     }
                     if(adUnitsFound > 0) {
                         logger.info(" siteId: " + siteId + " adUnits: " +  adUnits);
@@ -202,6 +205,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String siteId = requestIdSplit[0];
             String sectionId = requestId;
             String sectionName = "";
+            String networkAdUnitId = "";
             String activeDfpCurrencyCode = "USD";
             String siteDomain = "";
             JsonObject revShare = JsonObject.create();
@@ -218,13 +222,17 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 granularityMultiplier = Float
                         .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
                 activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
-                sectionName = ((JsonObject) customData.content().get("adUnits")).get(sectionId).toString();
+                JsonObject adUnits = (JsonObject) customData.content().get("adUnits");
+                JsonObject adUnitForSection = (JsonObject) adUnits.get(sectionId);
+                sectionName = adUnitForSection.get("sectionName").toString();
+                networkAdUnitId = adUnitForSection.get("networkAdUnitId").toString();
                 siteDomain = customData.content().get("siteDomain").toString();
                 logger.info("siteDomain=" + siteDomain);
                 logger.info(customData.content().get("ownerEmail").toString());
                 logger.info(customData.content().get("prebidGranularityMultiplier").toString());
                 logger.info(sectionId);
                 logger.info(sectionName);
+                logger.info(networkAdUnitId);
                 logger.info(revShare); // Another JsonObject
                 logger.info("newTargeting" + newTargeting.toString());
             } catch (NullPointerException e) {
@@ -319,6 +327,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     postBodyMap.put("uuid", uuid);
                     postBodyMap.put("sectionId", sectionId);
                     postBodyMap.put("sectionName", sectionName);
+                    postBodyMap.put("networkAdUnitId", networkAdUnitId);
                     postBodyMap.put("activeDfpCurrencyCode", activeDfpCurrencyCode);
                     postBodyMap.put("targeting", json);
                     postBodyMap.put("bidResponse", bidResJson);
