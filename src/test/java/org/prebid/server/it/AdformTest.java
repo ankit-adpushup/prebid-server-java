@@ -11,6 +11,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import java.io.IOException;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToIgnoreCase;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
@@ -28,7 +29,7 @@ public class AdformTest extends IntegrationTest {
     public void openrtb2AuctionShouldRespondWithBidsFromAdform() throws IOException, JSONException {
         // given
         // adform bid response for imp 12
-        wireMockRule.stubFor(get(urlPathEqualTo("/adform-exchange"))
+        WIRE_MOCK_RULE.stubFor(get(urlPathEqualTo("/adform-exchange"))
                 .withQueryParam("CC", equalTo("1"))
                 .withQueryParam("rp", equalTo("4"))
                 .withQueryParam("fd", equalTo("1"))
@@ -45,20 +46,18 @@ public class AdformTest extends IntegrationTest {
                 .withHeader("User-Agent", equalTo("userAgent"))
                 .withHeader("X-Request-Agent", equalTo("PrebidAdapter 0.1.3"))
                 .withHeader("X-Forwarded-For", equalTo("193.168.244.1"))
-                .withHeader("Cookie", equalTo(
-                        "uid=AF-UID;DigiTrust.v1.identity="
-                                // Base 64 encoded {"id":"id","version":1,"keyv":123,"privacy":{"optout":false}}
-                                + "eyJpZCI6ImlkIiwidmVyc2lvbiI6MSwia2V5diI6MTIzLCJwcml2YWN5Ijp7Im9wdG91dCI6ZmFsc2V9fQ"))
-                .withRequestBody(equalTo(""))
+                .withHeader("Cookie", equalTo("uid=AF-UID;DigiTrust.v1.identity=eyJpZCI6ImlkIiwidmVyc2l"
+                        + "vbiI6MSwia2V5diI6MTIzLCJwcml2YWN5Ijp7Im9wdG91dCI6ZmFsc2V9fQ"))
+                .withRequestBody(absent())
                 .willReturn(aResponse().withBody(jsonFrom("openrtb2/adform/test-adform-bid-response-1.json"))));
 
         // pre-bid cache
-        wireMockRule.stubFor(post(urlPathEqualTo("/cache"))
+        WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/cache"))
                 .withRequestBody(equalToJson(jsonFrom("openrtb2/adform/test-cache-adform-request.json")))
                 .willReturn(aResponse().withBody(jsonFrom("openrtb2/adform/test-cache-adform-response.json"))));
 
         // when
-        final Response response = given(spec)
+        final Response response = given(SPEC)
                 .header("Referer", "http://www.example.com")
                 .header("X-Forwarded-For", "193.168.244.1")
                 .header("User-Agent", "userAgent")
@@ -80,7 +79,7 @@ public class AdformTest extends IntegrationTest {
     public void auctionShouldRespondWithBidsFromAdform() throws IOException {
         // given
         // adform bid response for ad unit 12
-        wireMockRule.stubFor(get(urlPathEqualTo("/adform-exchange"))
+        WIRE_MOCK_RULE.stubFor(get(urlPathEqualTo("/adform-exchange"))
                 .withQueryParam("CC", equalTo("1"))
                 .withQueryParam("rp", equalTo("4"))
                 .withQueryParam("fd", equalTo("1"))
@@ -100,16 +99,16 @@ public class AdformTest extends IntegrationTest {
                 .withHeader("Cookie", equalTo("uid=AF-UID;DigiTrust.v1.identity"
                         //{"id":"id","version":1,"keyv":123,"privacy":{"optout":true}}
                         + "=eyJpZCI6ImlkIiwidmVyc2lvbiI6MSwia2V5diI6MTIzLCJwcml2YWN5Ijp7Im9wdG91dCI6dHJ1ZX19"))
-                .withRequestBody(equalTo(""))
+                .withRequestBody(absent())
                 .willReturn(aResponse().withBody(jsonFrom("auction/adform/test-adform-bid-response-1.json"))));
 
         // pre-bid cache
-        wireMockRule.stubFor(post(urlPathEqualTo("/cache"))
+        WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/cache"))
                 .withRequestBody(equalToJson(jsonFrom("auction/adform/test-cache-adform-request.json")))
                 .willReturn(aResponse().withBody(jsonFrom("auction/adform/test-cache-adform-response.json"))));
 
         // when
-        final Response response = given(spec)
+        final Response response = given(SPEC)
                 .header("Referer", "http://www.example.com")
                 .header("X-Forwarded-For", "193.168.244.1")
                 .header("User-Agent", "userAgent")

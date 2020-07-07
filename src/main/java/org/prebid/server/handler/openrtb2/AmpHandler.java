@@ -1,6 +1,5 @@
 package org.prebid.server.handler.openrtb2;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -36,13 +35,13 @@ import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
-import org.prebid.server.execution.LogModifier;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
+import org.prebid.server.manager.AdminManager;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
-import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
@@ -82,7 +81,7 @@ public class AmpHandler implements Handler<RoutingContext> {
     private final BidderCatalog bidderCatalog;
     private final Set<String> biddersSupportingCustomTargeting;
     private final AmpResponsePostProcessor ampResponsePostProcessor;
-    private final LogModifier logModifier;
+    private final AdminManager adminManager;
     private final JacksonMapper mapper;
 
     public AmpHandler(AmpRequestFactory ampRequestFactory,
@@ -93,7 +92,7 @@ public class AmpHandler implements Handler<RoutingContext> {
                       BidderCatalog bidderCatalog,
                       Set<String> biddersSupportingCustomTargeting,
                       AmpResponsePostProcessor ampResponsePostProcessor,
-                      LogModifier logModifier,
+                      AdminManager adminManager,
                       JacksonMapper mapper) {
 
         this.ampRequestFactory = Objects.requireNonNull(ampRequestFactory);
@@ -104,7 +103,7 @@ public class AmpHandler implements Handler<RoutingContext> {
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.biddersSupportingCustomTargeting = Objects.requireNonNull(biddersSupportingCustomTargeting);
         this.ampResponsePostProcessor = Objects.requireNonNull(ampResponsePostProcessor);
-        this.logModifier = Objects.requireNonNull(logModifier);
+        this.adminManager = Objects.requireNonNull(adminManager);
         this.mapper = Objects.requireNonNull(mapper);
     }
 
@@ -245,22 +244,9 @@ public class AmpHandler implements Handler<RoutingContext> {
         if (Objects.equals(bidRequest.getTest(), 1)) {
             return true;
         }
-        final ExtBidRequest extBidRequest = extBidRequestFrom(bidRequest);
-        final ExtRequestPrebid extRequestPrebid = extBidRequest != null ? extBidRequest.getPrebid() : null;
+        final ExtRequest extRequest = bidRequest.getExt();
+        final ExtRequestPrebid extRequestPrebid = extRequest != null ? extRequest.getPrebid() : null;
         return extRequestPrebid != null && Objects.equals(extRequestPrebid.getDebug(), 1);
-    }
-
-    /**
-     * Extracts {@link ExtBidRequest} from {@link BidRequest}.
-     */
-    private ExtBidRequest extBidRequestFrom(BidRequest bidRequest) {
-        try {
-            return bidRequest.getExt() != null
-                    ? mapper.mapper().treeToValue(bidRequest.getExt(), ExtBidRequest.class)
-                    : null;
-        } catch (JsonProcessingException e) {
-            throw new PreBidException(String.format("Error decoding bidRequest.ext: %s", e.getMessage()), e);
-        }
     }
 
     private ExtBidResponse extResponseFrom(BidResponse bidResponse) {
@@ -312,21 +298,26 @@ public class AmpHandler implements Handler<RoutingContext> {
                         .map(msg -> String.format("Invalid request format: %s", msg))
                         .collect(Collectors.toList());
                 final String message = String.join("\n", errorMessages);
-                logModifier.get().accept(logger, logMessageFrom(invalidRequestException, message, context));
+
+                // TODO adminManager: enable when admin endpoints can be bound on application port
+                //adminManager.accept(AdminManager.COUNTER_KEY, logger,
+                //        logMessageFrom(invalidRequestException, message, context));
+                conditionalLogger.info(String.format("%s, Referer: %s", message,
+                        context.request().headers().get(HttpUtil.REFERER_HEADER)), 100);
 
                 status = HttpResponseStatus.BAD_REQUEST.code();
                 body = message;
             } else if (exception instanceof UnauthorizedAccountException) {
                 metricRequestStatus = MetricName.badinput;
-                final String message = String.format("Unauthorized: %s", exception.getMessage());
+                final String message = exception.getMessage();
                 conditionalLogger.info(message, 100);
 
                 errorMessages = Collections.singletonList(message);
 
                 status = HttpResponseStatus.UNAUTHORIZED.code();
                 body = message;
-                String userId = ((UnauthorizedAccountException) exception).getAccountId();
-                metrics.updateAccountRequestRejectedMetrics(userId);
+                String accountId = ((UnauthorizedAccountException) exception).getAccountId();
+                metrics.updateAccountRequestRejectedMetrics(accountId);
             } else if (exception instanceof BlacklistedAppException
                     || exception instanceof BlacklistedAccountException) {
                 metricRequestStatus = exception instanceof BlacklistedAccountException
@@ -364,12 +355,6 @@ public class AmpHandler implements Handler<RoutingContext> {
             origin = ObjectUtils.defaultIfNull(context.request().headers().get("Origin"), StringUtils.EMPTY);
         }
         return origin;
-    }
-
-    private static String logMessageFrom(InvalidRequestException exception, String message, RoutingContext context) {
-        return exception.isNeedEnhancedLogging()
-                ? String.format("%s, Referer: %s", message, context.request().headers().get(HttpUtil.REFERER_HEADER))
-                : message;
     }
 
     private void respondWith(RoutingContext context, int status, String body, long startTime,

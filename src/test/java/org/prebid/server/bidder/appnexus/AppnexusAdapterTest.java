@@ -227,9 +227,9 @@ public class AppnexusAdapterTest extends VertxTest {
                 builder -> builder
                         .tid("tid1")
                         .user(User.builder()
-                                .ext(mapper.valueToTree(ExtUser.builder().consent("consent").build()))
+                                .ext(ExtUser.builder().consent("consent").build())
                                 .build())
-                        .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1, null))))
+                        .regs(Regs.of(0, ExtRegs.of(1, null)))
                         .timeoutMillis(1500L)
                         .device(Device.builder()
                                 .pxratio(new BigDecimal("4.2"))
@@ -276,9 +276,9 @@ public class AppnexusAdapterTest extends VertxTest {
                         .user(User.builder()
                                 .buyeruid("buyerUid")
                                 .id("buyerUid")
-                                .ext(mapper.valueToTree(ExtUser.builder().consent("consent").build()))
+                                .ext(ExtUser.builder().consent("consent").build())
                                 .build())
-                        .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1, null))))
+                        .regs(Regs.of(0, ExtRegs.of(1, null)))
                         .source(Source.builder()
                                 .fd(1)
                                 .tid("tid1")
@@ -642,12 +642,16 @@ public class AppnexusAdapterTest extends VertxTest {
                                         Bid.builder()
                                                 .impid("adUnitCode1")
                                                 .ext(mapper.valueToTree(AppnexusBidExt.of(
-                                                        AppnexusBidExtAppnexus.builder().bidAdType(BANNER_TYPE).build())))
+                                                        AppnexusBidExtAppnexus.builder()
+                                                                .bidAdType(BANNER_TYPE)
+                                                                .build())))
                                                 .build(),
                                         Bid.builder()
                                                 .impid("adUnitCode2")
                                                 .ext(mapper.valueToTree(AppnexusBidExt.of(
-                                                        AppnexusBidExtAppnexus.builder().bidAdType(BANNER_TYPE).build())))
+                                                        AppnexusBidExtAppnexus.builder()
+                                                                .bidAdType(BANNER_TYPE)
+                                                                .build())))
                                                 .build()))
                                 .build())));
 

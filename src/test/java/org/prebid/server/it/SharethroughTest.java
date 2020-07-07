@@ -33,11 +33,12 @@ public class SharethroughTest extends IntegrationTest {
     @Test
     public void openrtb2AuctionShouldRespondWithBidsFromSharethrough() throws IOException, JSONException {
         // given
-        wireMockRule.stubFor(post(urlPathEqualTo("/sharethrough-exchange"))
+        WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/sharethrough-exchange"))
                 .withQueryParam("placement_key", equalTo("abc123"))
                 .withQueryParam("bidId", equalTo("bid"))
                 .withQueryParam("consent_required", equalTo("false"))
                 .withQueryParam("consent_string", equalTo("consentValue"))
+                .withQueryParam("us_privacy", equalTo("1NYN"))
                 .withQueryParam("instant_play_capable", equalTo("true"))
                 .withQueryParam("stayInIframe", equalTo("true"))
                 .withQueryParam("height", equalTo("50"))
@@ -46,7 +47,7 @@ public class SharethroughTest extends IntegrationTest {
                 .withQueryParam("adRequestAt", equalTo(TEST_FORMATTED_TIME))
                 .withQueryParam("ttduid", equalTo("id"))
                 .withQueryParam("stxuid", equalTo("STR-UID"))
-                .withQueryParam("strVersion", equalTo("7"))
+                .withQueryParam("strVersion", equalTo("8"))
                 .withHeader("Accept", equalTo("application/json"))
                 .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=utf-8"))
                 .withHeader("User-Agent", equalTo("Android Chrome/60"))
@@ -59,13 +60,13 @@ public class SharethroughTest extends IntegrationTest {
                         aResponse().withBody(jsonFrom("openrtb2/sharethrough/test-sharethrough-bid-response-1.json"))));
 
         // pre-bid cache
-        wireMockRule.stubFor(post(urlPathEqualTo("/cache"))
+        WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/cache"))
                 .withRequestBody(equalToJson(jsonFrom("openrtb2/sharethrough/test-cache-sharethrough-request.json")))
                 .willReturn(
                         aResponse().withBody(jsonFrom("openrtb2/sharethrough/test-cache-sharethrough-response.json"))));
 
         // when
-        final Response response = given(spec)
+        final Response response = given(SPEC)
                 .header("Referer", "http://www.example.com")
                 .header("X-Forwarded-For", "193.168.244.1")
                 .header("User-Agent", "userAgent")

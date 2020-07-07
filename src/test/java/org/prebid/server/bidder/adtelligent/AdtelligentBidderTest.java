@@ -22,7 +22,6 @@ import org.prebid.server.bidder.model.HttpCall;
 import org.prebid.server.bidder.model.HttpRequest;
 import org.prebid.server.bidder.model.HttpResponse;
 import org.prebid.server.bidder.model.Result;
-import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
@@ -60,9 +59,9 @@ public class AdtelligentBidderTest extends VertxTest {
                         .ext(mapper.valueToTree(
                                 ExtPrebid.of(null, ExtImpAdtelligent.of(15, 1, 2, BigDecimal.valueOf(3))))).build()))
                 .user(User.builder()
-                        .ext(mapper.valueToTree(ExtUser.builder().consent("consent").build()))
+                        .ext(ExtUser.builder().consent("consent").build())
                         .build())
-                .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1, null))))
+                .regs(Regs.of(0, ExtRegs.of(1, null)))
                 .build();
 
         // when
@@ -87,9 +86,9 @@ public class AdtelligentBidderTest extends VertxTest {
                                                 ExtImpAdtelligent.of(15, 1, 2, BigDecimal.valueOf(3)))))
                                         .build()))
                         .user(User.builder()
-                                .ext(mapper.valueToTree(ExtUser.builder().consent("consent").build()))
+                                .ext(ExtUser.builder().consent("consent").build())
                                 .build())
-                        .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1, null))))
+                        .regs(Regs.of(0, ExtRegs.of(1, null)))
                         .build()));
     }
 
@@ -234,6 +233,7 @@ public class AdtelligentBidderTest extends VertxTest {
     public void makeBidsShouldReturnBidWithoutErrors() throws JsonProcessingException {
         // given
         final String response = mapper.writeValueAsString(BidResponse.builder()
+                .cur("EUR")
                 .seatbid(singletonList(SeatBid.builder()
                         .bid(singletonList(Bid.builder().impid("impId").build()))
                         .build()))
@@ -250,7 +250,7 @@ public class AdtelligentBidderTest extends VertxTest {
         // then
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.getValue()).hasSize(1)
-                .containsExactly(BidderBid.of(Bid.builder().impid("impId").build(), BidType.banner, null));
+                .containsExactly(BidderBid.of(Bid.builder().impid("impId").build(), BidType.banner, "EUR"));
     }
 
     @Test
@@ -407,9 +407,9 @@ public class AdtelligentBidderTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1)
                 .containsExactly(BidderError.badServerResponse(
-                        "Failed to decode: Unexpected end-of-input: expected close marker for Object (start marker at" +
-                                " [Source: (String)\"{\"; line: 1, column: 1])\n at [Source: (String)\"{\"; line: 1, " +
-                                "column: 3]"));
+                        "Failed to decode: Unexpected end-of-input: expected close marker for Object (start marker at"
+                                + " [Source: (String)\"{\"; line: 1, column: 1])\n at [Source: (String)\"{\"; line: 1, "
+                                + "column: 3]"));
     }
 
     private static HttpCall<BidRequest> givenHttpCall(String body) {
