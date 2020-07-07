@@ -2,6 +2,7 @@ package org.prebid.server.auction;
 
 import com.adpushup.e3.Database.DbManager;
 import com.adpushup.e3.Database.Cache.DbCacheManager;
+import com.adpushup.e3.Database.ElasticsearchManager;
 import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
@@ -51,6 +52,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private DbCacheManager dbCache;
     private ExecutorService executor;
     private final String LogSource = "PrebidServer.AmpPostProcessor";
+    private ElasticsearchManager esManager;
     private enum LogLevel {
         INFO(1),
         WARNING(2),
@@ -76,7 +78,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         Runnable runnableTask = () -> {
             try {
                 String logSource = LogSource + "." + logLevel;
-                DbManager.insertSystemLog(db, logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData);
+                esManager.insertSystemLog(logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData);
             } catch(Exception e) {
                 logger.error("Exception in send log task");
                 e.printStackTrace();
@@ -88,7 +90,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private void sendSystemLogEvent(Exception ex) {
         Runnable runnableTask = () -> {
             try {
-                DbManager.insertSystemLog(db, LogSource+".ERROR", ex);
+                esManager.insertSystemLog(LogSource+".ERROR", ex);
             } catch(Exception e) {
                 logger.error("Exception in send log task");
                 e.printStackTrace();
@@ -99,7 +101,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
     public AdpushupAmpResponsePostProcessor(String imdFeedbackHost, String imdFeedbackEndpoint,
             String imdFeedbackCreativeEndpoint, String[] ips, String cbUsername, String cbPassword,
-            JacksonMapper mapper) {
+            String esHost, JacksonMapper mapper) {
         this.logger = LoggerFactory.getLogger(AdpushupAmpResponsePostProcessor.class);
         this.vertx = Vertx.vertx();
         this.httpClient = new BasicHttpClient(vertx, vertx.createHttpClient());
@@ -109,6 +111,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
         this.dbCache = new DbCacheManager(51200, 300000 , db.getNewAppBucket(), db);
+        this.esManager = new ElasticsearchManager(esHost);
         this.executor = Executors.newFixedThreadPool(100);
 
         dbCache.queryAndSetCustomData(_bucket -> {

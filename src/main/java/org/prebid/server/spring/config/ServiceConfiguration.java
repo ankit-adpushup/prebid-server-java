@@ -557,9 +557,11 @@ public class ServiceConfiguration {
                                                               String cbUsername,
                                                               @Value("${adpushup.customConfig.couchbase-password}")
                                                               String cbPassword,
+                                                              @Value("${adpushup.customConfig.elasticsearch-host}")
+                                                              String esHost,
                                                               JacksonMapper mapper) {
         return new AdpushupAmpResponsePostProcessor(imdFeedbackHost, imdFeedbackEndpoint, imdFeedbackCreativeEndpoint,
-                                                    ips, cbUsername, cbPassword, mapper);
+                                                    ips, cbUsername, cbPassword, esHost, mapper);
     }
 
     @Bean
