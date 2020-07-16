@@ -559,9 +559,13 @@ public class ServiceConfiguration {
                                                               String cbPassword,
                                                               @Value("${adpushup.customConfig.elasticsearch-host}")
                                                               String esHost,
+                                                              @Value("${adpushup.customConfig.elasticsearch-logs-index}")
+                                                              String logsIndex,
+                                                              @Value("${adpushup.customConfig.elasticsearch-amp-logs-index}")
+                                                              String ampLogsIndex,
                                                               JacksonMapper mapper) {
         return new AdpushupAmpResponsePostProcessor(imdFeedbackHost, imdFeedbackEndpoint, imdFeedbackCreativeEndpoint,
-                                                    ips, cbUsername, cbPassword, esHost, mapper);
+                                                    ips, cbUsername, cbPassword, esHost, logsIndex, ampLogsIndex, mapper);
     }
 
     @Bean

@@ -18,8 +18,12 @@ public class ElasticsearchManager {
   private RestHighLevelClient client;
   private String _apRegion = System.getenv("AP_REGION");
   private String _localHostname;
+  private String logsIndex;
+  private String ampLogsIndex;
 
-  public ElasticsearchManager(String esHost) {
+  public ElasticsearchManager(String esHost, String logsIndex, String ampLogsIndex) {
+    this.logsIndex = logsIndex;
+    this.ampLogsIndex = ampLogsIndex;
     String localHostname;
     try {
       localHostname = InetAddress.getLocalHost().getHostName();
@@ -55,6 +59,14 @@ public class ElasticsearchManager {
     String logKey = "slog::" + (new UUID()).toString();
     JsonObject json = JsonObject.create();
     JsonObject meta = JsonObject.create();
+    String index = logsIndex;
+    if (message.contains("BidResponse::")) {
+      JsonObject debugDataObj = JsonObject.fromJson(debugData);
+      json.put("debugData", debugDataObj);
+      index = ampLogsIndex;
+    } else {
+      json.put("debugData", debugData);
+    }
     meta.put("id", logKey);
 
     json.put("type", type);
@@ -62,11 +74,11 @@ public class ElasticsearchManager {
     json.put("source", source);
     json.put("message", message);
     json.put("details", details);
-    json.put("debugData", debugData);
     json.put("hostname", _localHostname);
     json.put("region", _apRegion);
     json.put("meta", meta);
-    insert_doc("slog", json);
+
+    insert_doc(index, json);
   }
 
   public void insertSystemLog(String source, Exception ex) {

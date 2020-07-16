@@ -101,7 +101,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
     public AdpushupAmpResponsePostProcessor(String imdFeedbackHost, String imdFeedbackEndpoint,
             String imdFeedbackCreativeEndpoint, String[] ips, String cbUsername, String cbPassword,
-            String esHost, JacksonMapper mapper) {
+            String esHost, String logsIndex, String ampLogsIndex, JacksonMapper mapper) {
         this.logger = LoggerFactory.getLogger(AdpushupAmpResponsePostProcessor.class);
         this.vertx = Vertx.vertx();
         this.httpClient = new BasicHttpClient(vertx, vertx.createHttpClient());
@@ -111,7 +111,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.imdFeedbackCreativeEndpoint = imdFeedbackCreativeEndpoint;
         this.db = new DbManager(ips, cbUsername, cbPassword);
         this.dbCache = new DbCacheManager(51200, 300000 , db.getNewAppBucket(), db);
-        this.esManager = new ElasticsearchManager(esHost);
+        this.esManager = new ElasticsearchManager(esHost, logsIndex, ampLogsIndex);
         this.executor = Executors.newFixedThreadPool(100);
 
         dbCache.queryAndSetCustomData(_bucket -> {
