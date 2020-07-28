@@ -1,0 +1,50 @@
+adapters:
+  rubicon:
+    enabled: true
+    XAPI.Username: rubiuser
+    XAPI.Password: rubipw23
+  appnexus:
+    enabled: true
+  pubmatic:
+    enabled: true
+  sovrn:
+    enabled: true
+  openx:
+    enabled: true
+  lockerdome:
+    enabled: true
+  conversant:
+    enabled: true
+  apdummy:
+    enabled: true
+    endpoint: http://127.0.0.1:8081/test
+metrics:
+  prefix: prebid
+cache:
+  scheme: http
+  host: localhost:2424
+  path: /cache
+  query: uuid=
+settings:
+  filesystem:
+    enabled: true
+    settings-filename: sample/sample-app-settings.yaml
+    stored-requests-dir: sample/stored_requests
+    stored-imps-dir: sample/stored_requests
+    stored-responses-dir: sample/stored_requests
+gdpr:
+  default-value: 0
+  vendorlist:
+    filesystem-cache-dir: sample/tmp
+status-response: "ok"
+logger-level-modifier:
+  enabled: true
+adpushup:
+  imd-feedback-host: "http://localhost:8082"
+  imd-feedback-endpoint: "/imd_feedback"
+  imd-feedback-creative-endpoint: "/creativecall"
+  customConfig:
+    couchbase-ips: 127.0.0.1:8091
+    couchbase-username: Administrator
+    couchbase-password: password
+    elasticsearch-host: 127.0.0.1
