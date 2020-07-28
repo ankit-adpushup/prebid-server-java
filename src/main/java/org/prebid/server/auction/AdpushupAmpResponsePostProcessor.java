@@ -255,7 +255,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
 
     @Override
     public Future<AmpResponse> postProcess(BidRequest bidRequest, BidResponse bidResponse, AmpResponse ampResponse, RoutingContext context) {
-
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
         try {
             String bidResJson = mapper.encode(bidResponse);
@@ -285,7 +284,6 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);
                 logger.info("customData.content()::" + customData.content());
-                revShare = (JsonObject) customData.content().get("revenueShare");
                 granularityMultiplier = Float
                         .parseFloat(customData.content().get("prebidGranularityMultiplier").toString());
                 activeDfpCurrencyCode = customData.content().get("activeDFPCurrencyCode").toString();
@@ -294,6 +292,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 sectionName = adUnitForSection.get("sectionName").toString();
                 networkAdUnitId = adUnitForSection.get("networkAdUnitId").toString();
                 siteDomain = customData.content().get("siteDomain").toString();
+                revShare = (JsonObject) customData.content().get("revenueShare");
                 logger.info("siteDomain=" + siteDomain);
                 logger.info(customData.content().get("ownerEmail").toString());
                 logger.info(customData.content().get("prebidGranularityMultiplier").toString());
@@ -391,6 +390,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             logger.info("Generic Exception Caught");
             logger.info(e);
             e.printStackTrace();
+            sendSystemLogEvent(e);
             newTargeting = new HashMap<String, JsonNode>();
             return Future.succeededFuture(AmpResponse.of(newTargeting, ampResponse.getDebug(), ampResponse.getErrors()));
         }
