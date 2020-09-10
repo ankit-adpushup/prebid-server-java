@@ -8,6 +8,7 @@ import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.net.JksOptions;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
+import org.prebid.server.auction.AdpushupAmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
@@ -61,6 +62,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 
@@ -511,6 +513,27 @@ public class ServiceConfiguration {
     @Bean
     AmpResponsePostProcessor ampResponsePostProcessor() {
         return AmpResponsePostProcessor.noOp();
+    }
+
+    @Primary
+    @Bean
+    AmpResponsePostProcessor adpushupAmpResponsePostProcessor(@Value("${adpushup.imd-feedback-host}")
+                                                              String imdFeedbackHost,
+                                                              @Value("${adpushup.imd-feedback-endpoint}")
+                                                              String imdFeedbackEndpoint,
+                                                              @Value("${adpushup.imd-feedback-creative-endpoint}")
+                                                              String imdFeedbackCreativeEndpoint,
+                                                              @Value("${adpushup.customConfig.couchbase-ips}")
+                                                              String[] ips,
+                                                              @Value("${adpushup.customConfig.couchbase-username}")
+                                                              String cbUsername,
+                                                              @Value("${adpushup.customConfig.couchbase-password}")
+                                                              String cbPassword,
+                                                              @Value("${adpushup.customConfig.elasticsearch-host}")
+                                                              String esHost,
+                                                              JacksonMapper mapper) {
+        return new AdpushupAmpResponsePostProcessor(imdFeedbackHost, imdFeedbackEndpoint, imdFeedbackCreativeEndpoint,
+                                                    ips, cbUsername, cbPassword, esHost, mapper);
     }
 
     @Bean

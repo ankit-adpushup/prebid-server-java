@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Adpushup Dummy Adapter Params",
+  "description": "A schema which validates params accepted by TheMediaGrid adapter",
+  "type": "object",
+  "properties": {
+    "siteId": {
+      "type": "integer",
+      "description": "siteId"
+    },
+    "sectionId": {
+      "type": "string",
+      "description": "Section Id. Adding these params in case we want to send apfeedback from this adapter"
+    }
+  },
+  "required": []
+}

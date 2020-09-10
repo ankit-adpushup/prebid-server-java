@@ -15,6 +15,9 @@ adapters:
     enabled: true
   conversant:
     enabled: true
+  apdummy:
+    enabled: true
+    endpoint: http://127.0.0.1:8081/test
 metrics:
   prefix: prebid
 cache:
@@ -32,10 +35,6 @@ settings:
 gdpr:
   default-value: 0
   vendorlist:
-    v1:
-      cache-dir: /var/tmp/vendor1
-    v2:
-      cache-dir: /var/tmp/vendor2
     filesystem-cache-dir: sample/tmp
 status-response: "ok"
 logger-level-modifier:
@@ -48,3 +47,4 @@ adpushup:
     couchbase-ips: 127.0.0.1:8091
     couchbase-username: Administrator
     couchbase-password: password
+    elasticsearch-host: 127.0.0.1
