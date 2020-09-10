@@ -1,6 +1,7 @@
 adapters:
   apdummy:
     enabled: false
+    pbs-enforces-ccpa: false 
     pbs-enforces-gdpr: true
     modifying-vast-xml-allowed: true
     deprecated-names:

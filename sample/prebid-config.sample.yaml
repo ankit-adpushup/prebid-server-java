@@ -35,7 +35,25 @@ settings:
 gdpr:
   default-value: 0
   vendorlist:
-    filesystem-cache-dir: sample/tmp
+    v1:
+      cache-dir: /var/tmp/vendor1
+    v2:
+      cache-dir: /var/tmp/vendor2
+geolocation:
+  enabled: true
+  type: maxmind
+  maxmind:
+    remote-file-syncer:
+      download-url: # URL for GeoLite2-City.tar.gz
+      save-filepath: sample/prebid/GeoLite2-City.tar.gz
+      tmp-filepath: sample/prebid/tmp/GeoLite2-City.tar.gz
+      retry-count: 3
+      retry-interval-ms: 3000
+      timeout-ms: 600000
+      update-interval-ms: 0
+      http-client:
+        connect-timeout-ms: 2500
+        max-redirects: 3
 status-response: "ok"
 logger-level-modifier:
   enabled: true
