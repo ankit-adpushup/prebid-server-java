@@ -1,3 +1,4 @@
+status-response: "ok"
 adapters:
   rubicon:
     enabled: true
@@ -36,15 +37,3 @@ gdpr:
       cache-dir: /var/tmp/vendor1
     v2:
       cache-dir: /var/tmp/vendor2
-    filesystem-cache-dir: sample/tmp
-status-response: "ok"
-logger-level-modifier:
-  enabled: true
-adpushup:
-  imd-feedback-host: "http://localhost:8082"
-  imd-feedback-endpoint: "/imd_feedback"
-  imd-feedback-creative-endpoint: "/creativecall"
-  customConfig:
-    couchbase-ips: 127.0.0.1:8091
-    couchbase-username: Administrator
-    couchbase-password: password
