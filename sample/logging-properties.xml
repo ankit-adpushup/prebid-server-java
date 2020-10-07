@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="BIDRESPONSE_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/bidresponse.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>
+                %d{dd-MM-yyyy HH:mm:ss.SSS} [%thread] %-5level %logger{36}.%M - %msg%n
+            </Pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>
+            ${LOG_PATH}/archived/bidresponse_%d{dd-MM-yyyy}_%i.log
+        </fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        </rollingPolicy>
+    </appender>
+    <appender name="SLOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/slog.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>
+                %d{dd-MM-yyyy HH:mm:ss.SSS} [%thread] %-5level %logger{36}.%M - %msg%n
+            </Pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>
+            ${LOG_PATH}/archived/slog_%d{dd-MM-yyyy}_%i.log
+        </fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        </rollingPolicy>
+    </appender>
+    <logger name="bidresponse-logger" level="INFO">
+        <appender-ref ref="BIDRESPONSE_FILE"/>
+    </logger>
+    <logger name="slog-logger" level="INFO">
+        <appender-ref ref="SLOG_FILE"/>
+    </logger>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
