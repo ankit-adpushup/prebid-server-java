@@ -8,10 +8,11 @@
             </Pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-        <fileNamePattern>
-            ${LOG_PATH}/archived/bidresponse_%d{dd-MM-yyyy}_%i.log
-        </fileNamePattern>
-        <maxFileSize>100MB</maxFileSize>
+            <fileNamePattern>
+                ${LOG_PATH}/archived/bidresponse_%d{dd-MM-yyyy}_%i.log
+            </fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>7</maxHistory>
         </rollingPolicy>
     </appender>
     <appender name="SLOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -22,10 +23,11 @@
             </Pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-        <fileNamePattern>
-            ${LOG_PATH}/archived/slog_%d{dd-MM-yyyy}_%i.log
-        </fileNamePattern>
-        <maxFileSize>100MB</maxFileSize>
+            <fileNamePattern>
+                ${LOG_PATH}/archived/slog_%d{dd-MM-yyyy}_%i.log
+            </fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>7</maxHistory>
         </rollingPolicy>
     </appender>
     <logger name="bidresponse-logger" level="INFO">
