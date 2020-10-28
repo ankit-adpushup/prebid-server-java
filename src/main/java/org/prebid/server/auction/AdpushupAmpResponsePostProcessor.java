@@ -4,6 +4,8 @@ import com.adpushup.e3.Database.DbManager;
 // import com.adpushup.CustomSerializers.*;
 import com.adpushup.e3.Database.Cache.DbCacheManager;
 import com.adpushup.e3.Database.ElasticsearchManager;
+import com.adpushup.LogEnums.LogLevel;
+import com.adpushup.LogEnums.LogType;
 import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
@@ -59,32 +61,17 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private final String LogSource = "PrebidServer.AmpPostProcessor";
     private ElasticsearchManager esManager;
     private ObjectMapper bidResponseJsonMapperForLog;
-    private enum LogLevel {
-        INFO(1),
-        WARNING(2),
-        ERROR(3),
-        ERR(3),
-        UNKNOWN(4),
-        EXCEPTION(5);
-        private final int level;
-        LogLevel(final int level) {
-            this.level = level;
-        }
-        public int getValue() {
-            return level;
-        }
-    };
     private final String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0,"
     + "\"max\": 3," + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8,"
     + "\"increment\": 0.05" + "}," + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}"
     + "]" + "}";
     private final JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
 
-    private void sendSystemLogEvent(LogLevel logLevel, String message, String detailedMessage, String jsonDebugData, int logType) {
+    private void sendSystemLogEvent(LogLevel logLevel, String message, String detailedMessage, String jsonDebugData, LogType logType) {
         Runnable runnableTask = () -> {
             try {
                 String logSource = LogSource + "." + logLevel;
-                esManager.insertSystemLog(logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData, logType);
+                esManager.insertSystemLog(logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData, logType.getValue());
             } catch(Exception e) {
                 logger.error("Exception in send log task");
                 e.printStackTrace();
@@ -169,7 +156,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     if(rows.size() == 0) {
                         String message = "No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail;
                         logger.info(message);
-                        sendSystemLogEvent(LogLevel.ERROR, "UserDoc not found", message, "", 0); // logType 0 for slog 
+                        sendSystemLogEvent(LogLevel.ERROR, "UserDoc not found", message, "", LogType.SLOG); 
                         continue;
                     }
                     N1qlQueryRow i = rows.get(0);
@@ -280,7 +267,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             // Log bid response
             // seatbid[i].bid[i].adm holds the whole ad creative, which is too big and useless to log
             // so we remove it
-            sendSystemLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson, 1); // Last parameter is the logType which is 1 for bidResponse
+            sendSystemLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson, LogType.AMPBidResponse); // Last parameter is the logType which is 1 for bidResponse
 
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);

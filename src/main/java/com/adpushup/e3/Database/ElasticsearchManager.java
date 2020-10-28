@@ -33,6 +33,7 @@ public class ElasticsearchManager {
   private ObjectMapper mapper = new ObjectMapper();
   private Logger bidResponseLogger = LoggerFactory.getLogger("bidresponse-logger");
   private Logger slogLogger = LoggerFactory.getLogger("slog-logger");
+  private Logger logger = LoggerFactory.getLogger(ElasticsearchManager.class);
 
   public ElasticsearchManager(String esHost) {
     String localHostname;
@@ -73,12 +74,12 @@ public class ElasticsearchManager {
     json.put("type", type);
     json.put("date", System.currentTimeMillis());
     json.put("source", source);
-    json.put("message", message);
+    json.put("logMessage", message);
     json.put("details", details);
     json.put("hostname", _localHostname);
     json.put("region", _apRegion);
     json.put("id", logKey);
-    if (logType == 1) {
+    if (logType != 0) {
       try {
         ObjectNode debugDataJson;
         debugDataJson = (ObjectNode) new ObjectMapper().readTree(debugData);
@@ -87,7 +88,6 @@ public class ElasticsearchManager {
       } catch(JsonProcessingException  e ) {
         String debugDataJsonError = "Error Parsing debugData";
         json.put("bidResponse", debugDataJsonError);
-
       }
       bidResponseLogger.info(json);
     } else {
