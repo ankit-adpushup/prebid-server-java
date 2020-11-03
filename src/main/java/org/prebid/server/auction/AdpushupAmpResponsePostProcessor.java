@@ -92,6 +92,19 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         this.executor.execute(runnableTask);
     }
 
+    private void sendAuctionLogEvent(LogLevel logLevel, String message, String detailedMessage, String bidResJson, String impDataJson, LogType logType) {
+        Runnable runnableTask = () -> {
+            try {
+                String logSource = LogSource + "." + logLevel;
+                esManager.insertAuctionLog(logLevel.getValue(), logSource, message, detailedMessage, bidResJson, impDataJson, logType.getValue());
+            } catch(Exception e) {
+                logger.error("Exception in send log task");
+                e.printStackTrace();
+            }
+        };
+        this.executor.execute(runnableTask);
+    }
+
     // private String getBidResponseJSONForLogging(BidResponse bidResponse) 
     // throws JsonProcessingException {
     //     return this.bidResponseJsonMapperForLog.writeValueAsString(bidResponse);
@@ -246,6 +259,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
         try {
             String bidResJson = mapper.encode(bidResponse);
+            String impDataJson = mapper.encode(bidRequest.getImp());
             int pbPrecision = priceGranularityObject.getInt("precision");
             JsonArray rangesArray = priceGranularityObject.getArray("ranges");
             String requestId = bidRequest.getId();
@@ -267,7 +281,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             // Log bid response
             // seatbid[i].bid[i].adm holds the whole ad creative, which is too big and useless to log
             // so we remove it
-            sendSystemLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson, LogType.AMPBidResponse); // Last parameter is the logType which is 1 for bidResponse
+            sendAuctionLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson, impDataJson, LogType.AMPBidResponse); // Last parameter is the logType which is 1 for bidResponse
 
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);

@@ -4,6 +4,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.adpushup.e3.Database.ElasticsearchManager;
+import com.iab.openrtb.request.BidRequest;
 
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -19,26 +20,12 @@ public class AdpushupAnalyticsReporter implements AnalyticsReporter {
     private ElasticsearchManager esManager;
     private JacksonMapper mapper;
 
-    private void sendSystemLogEvent(LogEnums.LogLevel logLevel, String message, String detailedMessage, String jsonDebugData,
-            LogEnums.LogType logType) {
+    private void sendAuctionLogEvent(LogEnums.LogLevel logLevel, String message, String detailedMessage, String bidResJson, String impDataJson, LogEnums.LogType logType) {
         Runnable runnableTask = () -> {
             try {
                 String logSource = LogSource + "." + logLevel;
-                esManager.insertSystemLog(logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData,
-                        logType.getValue());
-            } catch (Exception e) {
-                logger.error("Exception in send log task");
-                e.printStackTrace();
-            }
-        };
-        this.executor.execute(runnableTask);
-    }
-
-    private void sendSystemLogEvent(Exception ex) {
-        Runnable runnableTask = () -> {
-            try {
-                esManager.insertSystemLog(LogSource + ".ERROR", ex);
-            } catch (Exception e) {
+                esManager.insertAuctionLog(logLevel.getValue(), logSource, message, detailedMessage, bidResJson, impDataJson, logType.getValue());
+            } catch(Exception e) {
                 logger.error("Exception in send log task");
                 e.printStackTrace();
             }
@@ -58,7 +45,9 @@ public class AdpushupAnalyticsReporter implements AnalyticsReporter {
         if (event instanceof AuctionEvent) {
             AuctionEvent e = (AuctionEvent) event;
             String bidResJson = mapper.encode(e.getBidResponse());
-            sendSystemLogEvent(LogEnums.LogLevel.INFO, LogMessage, "", bidResJson, LogEnums.LogType.AuctionBidResponse);
+            BidRequest bidReq = e.getAuctionContext().getBidRequest();
+            String impArray = mapper.encode(bidReq.getImp());
+            sendAuctionLogEvent(LogEnums.LogLevel.INFO, LogMessage, "", bidResJson, impArray, LogEnums.LogType.AuctionBidResponse);
         }
     }
 }

@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
@@ -79,21 +80,32 @@ public class ElasticsearchManager {
     json.put("hostname", _localHostname);
     json.put("region", _apRegion);
     json.put("id", logKey);
-    if (logType != 0) {
-      try {
-        ObjectNode debugDataJson;
-        debugDataJson = (ObjectNode) new ObjectMapper().readTree(debugData);
-        json.set("bidResponse", debugDataJson);
+    json.put("debugData", debugData);
+    slogLogger.info(json);
+  }
 
-      } catch(JsonProcessingException  e ) {
-        String debugDataJsonError = "Error Parsing debugData";
-        json.put("bidResponse", debugDataJsonError);
-      }
-      bidResponseLogger.info(json);
-    } else {
-      json.put("debugData", debugData);
-      slogLogger.info(json);
+  public void insertAuctionLog(int type, String source, String message, String details, String bidResponse, String impData, int logType) {
+    String logKey = "slog::" + (new UUID()).toString();
+    ObjectNode json = JsonNodeFactory.instance.objectNode();
+    json.put("type", type);
+    json.put("date", System.currentTimeMillis());
+    json.put("source", source);
+    json.put("logMessage", message);
+    json.put("details", details);
+    json.put("hostname", _localHostname);
+    json.put("region", _apRegion);
+    json.put("id", logKey);
+    try {
+      ObjectNode bidResJson = (ObjectNode) new ObjectMapper().readTree(bidResponse);
+      ArrayNode impDataJson = (ArrayNode) new ObjectMapper().readTree(impData);
+      json.set("bidResponse", bidResJson);
+      json.set("impData", impDataJson);
+
+    } catch(JsonProcessingException  e ) {
+      String debugDataJsonError = "Error Parsing debugData";
+      json.put("parsingException", e.toString());
     }
+    bidResponseLogger.info(json);
   }
 
   public void insertSystemLog(String source, Exception ex) {
