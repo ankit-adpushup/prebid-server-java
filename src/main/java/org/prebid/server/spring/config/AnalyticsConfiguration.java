@@ -1,6 +1,8 @@
 package org.prebid.server.spring.config;
 
 import io.vertx.core.Vertx;
+
+import com.adpushup.AdpushupAnalyticsReporter;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.CompositeAnalyticsReporter;
 import org.prebid.server.analytics.LogAnalyticsReporter;
@@ -8,6 +10,7 @@ import org.prebid.server.json.JacksonMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Collections;
@@ -27,5 +30,11 @@ public class AnalyticsConfiguration {
     @ConditionalOnProperty(prefix = "analytics.log", name = "enabled", havingValue = "true")
     LogAnalyticsReporter logAnalyticsReporter(JacksonMapper mapper) {
         return new LogAnalyticsReporter(mapper);
+    }
+    @Bean
+    AdpushupAnalyticsReporter adpushupAnalyticsReporter(JacksonMapper mapper, 
+                                                        @Value("${adpushup.customConfig.elasticsearch-host}")
+                                                        String esHost) {
+        return new AdpushupAnalyticsReporter(mapper, esHost);
     }
 }

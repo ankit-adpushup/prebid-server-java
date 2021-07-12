@@ -4,6 +4,8 @@ import com.adpushup.e3.Database.DbManager;
 // import com.adpushup.CustomSerializers.*;
 import com.adpushup.e3.Database.Cache.DbCacheManager;
 import com.adpushup.e3.Database.ElasticsearchManager;
+import com.adpushup.LogEnums.LogLevel;
+import com.adpushup.LogEnums.LogType;
 import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
@@ -39,6 +41,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.logging.FileHandler;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -58,32 +61,17 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
     private final String LogSource = "PrebidServer.AmpPostProcessor";
     private ElasticsearchManager esManager;
     private ObjectMapper bidResponseJsonMapperForLog;
-    private enum LogLevel {
-        INFO(1),
-        WARNING(2),
-        ERROR(3),
-        ERR(3),
-        UNKNOWN(4),
-        EXCEPTION(5);
-        private final int level;
-        LogLevel(final int level) {
-            this.level = level;
-        }
-        public int getValue() {
-            return level;
-        }
-    };
     private final String priceGranularityJson = "{" + "\"precision\": 2," + "\"ranges\": [" + "{" + "\"min\": 0,"
     + "\"max\": 3," + "\"increment\": 0.01" + "}," + "{" + "\"min\": 3," + "\"max\": 8,"
     + "\"increment\": 0.05" + "}," + "{" + "\"min\": 8," + "\"max\": 20," + "\"increment\": 0.5" + "}"
     + "]" + "}";
     private final JsonObject priceGranularityObject = JsonObject.fromJson(priceGranularityJson);
 
-    private void sendSystemLogEvent(LogLevel logLevel, String message, String detailedMessage, String jsonDebugData) {
+    private void sendSystemLogEvent(LogLevel logLevel, String message, String detailedMessage, String jsonDebugData, LogType logType) {
         Runnable runnableTask = () -> {
             try {
                 String logSource = LogSource + "." + logLevel;
-                esManager.insertSystemLog(logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData);
+                esManager.insertSystemLog(logLevel.getValue(), logSource, message, detailedMessage, jsonDebugData, logType.getValue());
             } catch(Exception e) {
                 logger.error("Exception in send log task");
                 e.printStackTrace();
@@ -96,6 +84,19 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         Runnable runnableTask = () -> {
             try {
                 esManager.insertSystemLog(LogSource+".ERROR", ex);
+            } catch(Exception e) {
+                logger.error("Exception in send log task");
+                e.printStackTrace();
+            }
+        };
+        this.executor.execute(runnableTask);
+    }
+
+    private void sendAuctionLogEvent(LogLevel logLevel, String message, String detailedMessage, String bidResJson, String impDataJson, LogType logType) {
+        Runnable runnableTask = () -> {
+            try {
+                String logSource = LogSource + "." + logLevel;
+                esManager.insertAuctionLog(logLevel.getValue(), logSource, message, detailedMessage, bidResJson, impDataJson, logType.getValue());
             } catch(Exception e) {
                 logger.error("Exception in send log task");
                 e.printStackTrace();
@@ -168,7 +169,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     if(rows.size() == 0) {
                         String message = "No user doc found for siteId=" + siteId + " and ownerEmail=" + ownerEmail;
                         logger.info(message);
-                        sendSystemLogEvent(LogLevel.ERROR, "UserDoc not found", message, "");
+                        sendSystemLogEvent(LogLevel.ERROR, "UserDoc not found", message, "", LogType.SLOG); 
                         continue;
                     }
                     N1qlQueryRow i = rows.get(0);
@@ -258,6 +259,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
         Map<String, JsonNode> newTargeting = ampResponse.getTargeting();
         try {
             String bidResJson = mapper.encode(bidResponse);
+            String impDataJson = mapper.encode(bidRequest.getImp());
             int pbPrecision = priceGranularityObject.getInt("precision");
             JsonArray rangesArray = priceGranularityObject.getArray("ranges");
             String requestId = bidRequest.getId();
@@ -279,7 +281,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             // Log bid response
             // seatbid[i].bid[i].adm holds the whole ad creative, which is too big and useless to log
             // so we remove it
-            sendSystemLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson);
+            sendAuctionLogEvent(LogLevel.INFO, "BidResponse::"+requestId, "", bidResJson, impDataJson, LogType.AMPBidResponse); // Last parameter is the logType which is 1 for bidResponse
 
             try {
                 JsonDocument customData = dbCache.getCustom(siteId);
@@ -352,11 +354,22 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                             if (adjustedCpm.compareTo(largestMax) > 0) {
                                 pb = largestMax;
                             } else {
+                                logger.info("===========TEST===========");
+                                logger.info(granularityMultiplier);
                                 for (Object s : rangesArray) {
                                     max = new BigDecimal(((JsonObject) s).get("max").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
+                                    logger.info("InsideLoop");
+                                    logger.info("max: " + max);
                                     min = new BigDecimal(((JsonObject) s).get("min").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
+                                    logger.info("min: " + min);
                                     increment = new BigDecimal(((JsonObject) s).get("increment").toString()).multiply(BigDecimal.valueOf(granularityMultiplier));
+                                    logger.info("increment: " + increment);
+                                    logger.info("adjustedCpm: " + adjustedCpm);
                                     if (adjustedCpm.compareTo(max) < 0 && adjustedCpm.compareTo(min) >= 0) {
+                                        logger.info("======INSIDE IF=====");
+                                        logger.info(adjustedCpm);
+                                        logger.info(max);
+                                        logger.info(min);
                                         int cpmToFloor = ((adjustedCpm.multiply(pow).subtract(min.multiply(pow)))
                                                 .divide(increment.multiply(pow), RoundingMode.DOWN)).intValue();
                                         pb = increment.multiply(BigDecimal.valueOf(cpmToFloor)).add(min);
@@ -381,6 +394,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                     newTargeting.put("hb_ap_auction_id", TextNode.valueOf(uuid));
                 } catch(Exception ex) {
                     logger.info(ex);
+                    ex.printStackTrace();
                     sendSystemLogEvent(ex);
                 }
             }
