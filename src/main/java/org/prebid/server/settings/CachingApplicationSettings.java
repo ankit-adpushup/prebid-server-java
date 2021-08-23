@@ -137,9 +137,11 @@ public class CachingApplicationSettings implements ApplicationSettings {
         final Map<String, String> storedIdToImp = getFromCacheOrAddMissedIds(impIds, impCache, missedImpIds);
 
         if (missedRequestIds.isEmpty() && missedImpIds.isEmpty()) {
+            logger.info("Stored Request found in cache");
             return Future.succeededFuture(
                     StoredDataResult.of(storedIdToRequest, storedIdToImp, Collections.emptyList()));
         }
+        logger.info("Stored Request not found in cache");
 
         // delegate call to original source for missed ids and update cache with it
         return retriever.apply(missedRequestIds, missedImpIds, timeout).compose(result -> {

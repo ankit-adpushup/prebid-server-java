@@ -98,6 +98,7 @@ public class HttpPeriodicRefreshService implements Initializable {
     }
 
     private void getAll() {
+        logger.info("Request Sent for the first time " + refreshUrl);
         httpClient.get(refreshUrl, timeout)
                 .map(this::processResponse)
                 .map(this::save)
@@ -128,12 +129,14 @@ public class HttpPeriodicRefreshService implements Initializable {
     }
 
     private HttpRefreshResponse processResponse(HttpClientResponse response) {
+        logger.info("Response Received from bid request storage service, status code: " + response.getStatusCode());
         final int statusCode = response.getStatusCode();
         if (statusCode != 200) {
             throw new PreBidException(String.format("HTTP status code %d", statusCode));
         }
 
         final String body = response.getBody();
+        logger.info("Response Body: \n" + body);
         final HttpRefreshResponse refreshResponse;
         try {
             refreshResponse = mapper.decodeValue(body, HttpRefreshResponse.class);
@@ -170,6 +173,7 @@ public class HttpPeriodicRefreshService implements Initializable {
         final String andOrParam = refreshUrl.contains("?") ? "&" : "?";
         final String refreshEndpoint = refreshUrl + andOrParam + lastModifiedParam;
 
+        logger.info("Refreshing Stored Requests, hitting endpoint: " + refreshEndpoint);
         httpClient.get(refreshEndpoint, timeout)
                 .map(this::processResponse)
                 .map(this::invalidate)
