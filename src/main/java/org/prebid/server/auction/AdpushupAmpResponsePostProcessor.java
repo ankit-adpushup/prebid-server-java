@@ -230,6 +230,7 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
             String pageUrl = bidRequest.getSite().getPage();
             String deviceUA = bidRequest.getDevice().getUa();
             String deviceIp = bidRequest.getDevice().getIp();
+            logger.info("============= Device Ip: " + deviceIp);
             postBodyMap.put("siteId", siteId);
             postBodyMap.put("siteDomain", siteDomain);
             postBodyMap.put("pageUrl", pageUrl);
@@ -399,6 +400,8 @@ public class AdpushupAmpResponsePostProcessor implements AmpResponsePostProcesso
                 }
             }
             winningCpm = isGross ? adjustedCpm : originalCpm;
+
+            logger.info("============X-Real-IP: " + context.request().headers().get("X-Real-IP"));
             sendApFeedback(newTargeting, bidRequest, siteId, siteDomain, uuid, sectionId, sectionName, networkAdUnitId, activeDfpCurrencyCode, bidResJson, winningCpm);
         } catch (Exception e) {
             logger.info("Generic Exception Caught");
