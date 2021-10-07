@@ -14,8 +14,22 @@ spec:
       labels:
         app: prebidserverservice
     spec:
+      volumes:
+    # `name` here must match the name
+    # specified in the volume mount
+        - name: env-configmap-volume
+      # Populate the volume with config map data
+          configMap:
+        # `name` here must match the name
+        # specified in the ConfigMap's YAML
+            name: env-configmap
       containers:
       - name: prebidserverservice
         image: us-docker.pkg.dev/ci-cd-and-monitoring/amp-staging/prebidserverservice:version 
         ports:
         - containerPort: 8089
+        volumeMounts:
+        # `name` here must match the name
+        # from the volumes section of this pod
+          - name: env-configmap-volume
+            mountPath: /etc/config
